@@ -16,6 +16,8 @@ export default function Sidebar() {
   // ✅ ADMIN / MANAGER mới thấy
   if (user?.role === "ADMIN" || user?.role === "MANAGER") {
     items.push({ key: "/technicians", label: "Technicians" });
+    items.push({ key: "/tenant-requests", label: "Tenant Requests" });
+    items.push({ key: "/checklist-templates", label: "Checklist Templates" });
   }
 
   return <Menu mode="inline" onClick={(e) => nav(e.key)} items={items} />;

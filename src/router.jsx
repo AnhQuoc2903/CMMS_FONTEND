@@ -7,15 +7,17 @@ import Inventory from "./pages/Inventory";
 import TenantRequest from "./pages/TenantRequest";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import MainLayout from "./layouts/MainLayout";
-import AssetDetail from "./pages/AssetDetail"; // ✅ FIX
+import AssetDetail from "./pages/AssetDetail";
 import Technicians from "./pages/Technicians";
+import TenantRequestForm from "./pages/TenantRequestForm";
+import ChecklistTemplates from "./pages/ChecklistTemplates";
 
 export default function Router() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/tenant" element={<TenantRequest />} />
+        <Route path="/request" element={<TenantRequestForm />} />
 
         <Route element={<MainLayout />}>
           <Route
@@ -76,6 +78,22 @@ export default function Router() {
             element={
               <ProtectedRoute roles={["ADMIN", "MANAGER"]}>
                 <Technicians />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/checklist-templates"
+            element={
+              <ProtectedRoute roles={["ADMIN", "MANAGER"]}>
+                <ChecklistTemplates />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tenant-requests"
+            element={
+              <ProtectedRoute roles={["ADMIN", "MANAGER"]}>
+                <TenantRequest />
               </ProtectedRoute>
             }
           />

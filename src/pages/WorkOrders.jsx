@@ -28,7 +28,16 @@ export default function WorkOrders() {
         {
           title: "Status",
           dataIndex: "status",
-          render: (s) => <Tag color={s === "DONE" ? "green" : "blue"}>{s}</Tag>,
+          render: (s) => {
+            let color = "blue";
+
+            if (["COMPLETED", "CLOSED"].includes(s)) color = "green";
+            if (s === "IN_PROGRESS") color = "orange";
+            if (s === "REJECTED") color = "red";
+            if (s === "PENDING_APPROVAL") color = "gold";
+
+            return <Tag color={color}>{s}</Tag>;
+          },
         },
       ]}
     />

@@ -1,26 +1,31 @@
-import { Checkbox, Button } from "antd";
-import { useState } from "react";
+import { Checkbox, List, Empty } from "antd";
 
-export default function Checklist({ data = [], onSave }) {
-  const [items, setItems] = useState(data);
-
-  const toggle = (i) => {
-    const c = [...items];
-    c[i].isDone = !c[i].isDone;
-    setItems(c);
-  };
+export default function Checklist({ data = [], disabled, onSave }) {
+  if (!data.length) return null;
 
   return (
-    <>
-      {items.map((c, i) => (
-        <Checkbox key={i} checked={c.isDone} onChange={() => toggle(i)}>
-          {c.title}
-        </Checkbox>
-      ))}
+    <List
+      bordered
+      dataSource={data}
+      renderItem={(item, idx) => (
+        <List.Item>
+          <Checkbox
+            checked={item.isDone}
+            disabled={disabled}
+            onChange={(e) => {
+              if (!onSave) return;
 
-      <Button className="mt-2" type="primary" onClick={() => onSave(items)}>
-        Save Checklist
-      </Button>
-    </>
+              const next = data.map((c, i) =>
+                i === idx ? { ...c, isDone: e.target.checked } : c
+              );
+
+              onSave(next); // 👈 BẮT BUỘC là array
+            }}
+          >
+            {item.title}
+          </Checkbox>
+        </List.Item>
+      )}
+    />
   );
 }
