@@ -274,9 +274,14 @@ export default function WorkOrderDetail() {
       {/* TECHNICIAN WORK CHECKLIST */}
       {wo.checklist?.length > 0 ? (
         <Checklist
-          data={wo.checklist}
+          data={wo.checklist || []}
           disabled={!can("work", status, role)}
-          onSave={can("work", status, role) ? handleChecklistSave : null}
+          onSave={(list) =>
+            updateChecklist(id, list).then(() => {
+              message.success("Checklist saved");
+              loadWO();
+            })
+          }
         />
       ) : (
         <Alert
