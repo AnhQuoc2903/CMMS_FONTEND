@@ -55,3 +55,21 @@ export const applyChecklistTemplate = (id, templateId) =>
   api.post(`/work-orders/${id}/apply-checklist-template`, {
     templateId,
   });
+
+export const reviewWorkOrder = (id, note) =>
+  api.patch(`/work-orders/${id}/review`, { note });
+
+export const verifyWorkOrder = (id) => api.patch(`/work-orders/${id}/verify`);
+
+export const updatePriority = (id, priority) =>
+  api.patch(`/work-orders/${id}/priority`, { priority });
+
+// ===== REVIEW / VERIFY REJECT =====
+export const rejectReview = (id, reason) =>
+  api.patch(`/work-orders/${id}/review-reject`, { reason });
+
+export const rejectVerification = (id, reason) =>
+  api.patch(`/work-orders/${id}/verify-reject`, { reason });
+
+export const getMyWorkOrderHistory = (id) =>
+  api.get(`/work-orders/${id}/my-history`);
