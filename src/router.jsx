@@ -12,6 +12,7 @@ import Technicians from "./pages/Technicians";
 import TenantRequestForm from "./pages/TenantRequestForm";
 import ChecklistTemplates from "./pages/ChecklistTemplates";
 import InventoryHistory from "./pages/InventoryHistory";
+import MaintenancePlans from "./pages/MaintenancePlans";
 
 export default function Router() {
   return (
@@ -103,6 +104,14 @@ export default function Router() {
             element={
               <ProtectedRoute roles={["ADMIN", "MANAGER"]}>
                 <InventoryHistory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/maintenance-plans"
+            element={
+              <ProtectedRoute roles={["ADMIN", "MANAGER"]}>
+                <MaintenancePlans />
               </ProtectedRoute>
             }
           />

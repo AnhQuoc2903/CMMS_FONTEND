@@ -142,6 +142,8 @@ export default function WorkOrderDetail() {
     ["ADMIN", "MANAGER"].includes(role) &&
     ["APPROVED", "ASSIGNED"].includes(status);
 
+  const isPM = !!wo.maintenancePlan;
+
   /* ================= HANDLERS ================= */
 
   const handleSignatureSave = async (base64) => {
@@ -197,6 +199,25 @@ export default function WorkOrderDetail() {
   /* ================= UI ================= */
   return (
     <>
+      {wo.maintenancePlan && (
+        <Alert
+          type="info"
+          showIcon
+          message="Preventive Maintenance Work Order"
+          description={
+            <>
+              <div>
+                <b>Plan:</b> {wo.maintenancePlan.name}
+              </div>
+              <div>
+                <b>Frequency:</b> {wo.maintenancePlan.frequency}
+              </div>
+            </>
+          }
+          style={{ marginBottom: 12 }}
+        />
+      )}
+
       <Card
         title={wo.title}
         extra={
@@ -527,7 +548,7 @@ export default function WorkOrderDetail() {
         <h3>Checklist</h3>
 
         {/* ADMIN – APPLY TEMPLATE */}
-        {role === "ADMIN" && status === "APPROVED" && (
+        {role === "ADMIN" && status === "APPROVED" && !isPM && (
           <Select
             style={{ width: "100%", marginBottom: 16 }}
             placeholder="Apply checklist template"
@@ -586,7 +607,7 @@ export default function WorkOrderDetail() {
           mode="multiple"
           style={{ width: "100%" }}
           value={selectedAssets}
-          disabled={!can("assign", status, role)}
+          disabled={isPM || !can("assign", status, role)}
           onChange={async (values) => {
             try {
               await assignAssets(id, values);

@@ -10,3 +10,4 @@ export const getAssetDetail = (id) => api.get(`/assets/${id}`);
 export const getAssetHistory = (id) => api.get(`/assets/${id}/history`);
 export const maintainAsset = (id, note) =>
   api.patch(`/assets/${id}/maintain`, { note });
+export const getAssetPMHistory = (id) => api.get(`/assets/${id}/pm-history`);
