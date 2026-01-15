@@ -73,3 +73,5 @@ export const rejectVerification = (id, reason) =>
 
 export const getMyWorkOrderHistory = (id) =>
   api.get(`/work-orders/${id}/my-history`);
+export const updateUsedParts = (id, usedParts) =>
+  api.patch(`/work-orders/${id}/used-parts`, { usedParts });

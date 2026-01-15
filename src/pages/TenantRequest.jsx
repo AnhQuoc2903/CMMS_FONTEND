@@ -63,14 +63,19 @@ export default function TenantRequests() {
             dataIndex: "title",
           },
           {
-            title: "Tenant",
-            render: (_, r) => (
-              <>
-                <div>{r.tenantName}</div>
-                <small>{r.tenantEmail}</small>
-              </>
-            ),
+            title: "Description",
+            dataIndex: "description",
+            ellipsis: true,
           },
+          {
+            title: "Tenant Name",
+            dataIndex: "tenantName",
+          },
+          {
+            title: "Tenant Email",
+            dataIndex: "tenantEmail",
+          },
+
           {
             title: "Status",
             render: (_, r) =>

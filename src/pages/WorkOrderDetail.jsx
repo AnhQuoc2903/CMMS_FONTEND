@@ -34,10 +34,12 @@ import {
   rejectReview,
   rejectVerification,
   getMyWorkOrderHistory,
+  updateUsedParts,
 } from "../api/workOrder.api";
 
 import { getAssets } from "../api/asset.api";
 import { getTechnicians } from "../api/user.api";
+import { getInventory } from "../api/inventory.api";
 import { getChecklistTemplates } from "../api/checklistTemplate.api";
 
 import Checklist from "../components/Checklist";
@@ -45,6 +47,7 @@ import UploadPhoto from "../components/UploadPhoto";
 import SignaturePad from "../components/SignaturePad";
 import { can } from "../utils/workOrderPermissions";
 import { useAuth } from "../auth/AuthContext";
+import UsedPartsEditor from "../components/UsedPartsEditor";
 
 export default function WorkOrderDetail() {
   const { id } = useParams();
@@ -63,6 +66,7 @@ export default function WorkOrderDetail() {
   const [rejectReason, setRejectReason] = useState("");
   const [rejectType, setRejectType] = useState(null);
   const [history, setHistory] = useState([]);
+  const [inventory, setInventory] = useState([]);
 
   // "review" | "verify"
 
@@ -110,7 +114,22 @@ export default function WorkOrderDetail() {
     }
   }, [id, role]);
 
+  useEffect(() => {
+    if (role === "TECHNICIAN") {
+      getInventory({ status: "ACTIVE" }).then((r) => setInventory(r.data));
+    }
+  }, [role]);
+
   if (!wo) return null;
+  // ===== MERGE INVENTORY + USED PARTS (INACTIVE STILL VISIBLE) =====
+  const activeInventory = inventory;
+
+  const mergedInventory = [
+    ...activeInventory,
+    ...(wo.usedParts
+      ?.map((p) => p.part)
+      .filter((p) => p && !activeInventory.find((a) => a._id === p._id)) || []),
+  ];
 
   const selectedAssets =
     wo.assignedAssets?.map((a) => (typeof a === "string" ? a : a._id)) || [];
@@ -149,6 +168,32 @@ export default function WorkOrderDetail() {
     CRITICAL: "red",
   };
 
+  const mergedTechnicians = [
+    ...(wo.assignedTechnicians || []),
+    ...technicians.filter(
+      (t) => !(wo.assignedTechnicians || []).find((a) => a._id === t._id)
+    ),
+  ];
+
+  const hasChecklist = wo.checklist && wo.checklist.length > 0;
+  const canStartWork = can("start", status, role) && hasChecklist;
+
+  const myTech = wo.assignedTechnicians?.find((t) => t._id === user?.id);
+
+  const isInactiveTech = myTech && myTech.status !== "ACTIVE";
+
+  const isTemplateInactive =
+    wo.checklistTemplate &&
+    !templates.some((t) => t._id === wo.checklistTemplate.templateId);
+
+  const checklistTemplateInactive =
+    wo.checklistTemplate && templates.length === 0;
+
+  const loadInventory = async () => {
+    const r = await getInventory({ status: "ACTIVE" });
+    setInventory(r.data);
+  };
+
   /* ================= UI ================= */
   return (
     <>
@@ -162,6 +207,15 @@ export default function WorkOrderDetail() {
           )
         }
       >
+        {wo.assignedTechnicians?.some((t) => t.status === "INACTIVE") && (
+          <Alert
+            type="warning"
+            showIcon
+            message="This work order contains INACTIVE technicians"
+            style={{ marginBottom: 12 }}
+          />
+        )}
+
         {status === "CLOSED" && (
           <Alert
             type="info"
@@ -170,6 +224,37 @@ export default function WorkOrderDetail() {
             className="mb-3"
           />
         )}
+
+        {checklistTemplateInactive && (
+          <Alert
+            type="warning"
+            showIcon
+            message="Checklist template is INACTIVE"
+            description="This checklist was created from an inactive template and cannot be modified."
+            style={{ marginBottom: 12 }}
+          />
+        )}
+
+        {isInactiveTech && (
+          <Alert
+            type="error"
+            showIcon
+            message="Your technician account is INACTIVE"
+            description="You cannot update checklist or perform work."
+            style={{ marginBottom: 12 }}
+          />
+        )}
+
+        {isTemplateInactive && (
+          <Alert
+            type="warning"
+            showIcon
+            message="Checklist template is INACTIVE"
+            description="Checklist is read-only."
+            style={{ marginBottom: 12 }}
+          />
+        )}
+
         {wo.dueAt && new Date() > new Date(wo.dueAt) && (
           <Alert
             type="error"
@@ -291,19 +376,23 @@ export default function WorkOrderDetail() {
             </Button>
           )}
 
+          {can("start", status, role) && !hasChecklist && (
+            <Alert
+              type="error"
+              showIcon
+              message="Checklist is required before starting work"
+              style={{ marginBottom: 12 }}
+            />
+          )}
+
           {can("start", status, role) && (
             <Button
               type="primary"
+              disabled={!canStartWork}
               onClick={async () => {
-                try {
-                  await startWorkOrder(id);
-                  message.success("Work started");
-                  loadWO();
-                } catch (err) {
-                  message.error(
-                    err?.response?.data?.message || "Cannot start work order"
-                  );
-                }
+                await startWorkOrder(id);
+                message.success("Work started");
+                loadWO();
               }}
             >
               Start Work
@@ -340,52 +429,6 @@ export default function WorkOrderDetail() {
           />
         )}
 
-        {wo.verification && (
-          <Alert
-            type="success"
-            showIcon
-            style={{ marginTop: 12 }}
-            message="Verified & Approved"
-            description={
-              <div>
-                <b>Verified at:</b>{" "}
-                {new Date(wo.verification.verifiedAt).toLocaleString()}
-              </div>
-            }
-          />
-        )}
-
-        {/* ===== ASSIGN TECHNICIANS ===== */}
-        {canAssignTechnician && (
-          <>
-            <Divider />
-            <h3>Assigned Technicians</h3>
-            <Select
-              mode="multiple"
-              style={{ width: "100%" }}
-              value={selectedTechnicians}
-              disabled={!can("assign", status, role)}
-              onChange={async (values) => {
-                try {
-                  await assignTechnicians(id, values);
-                  message.success("Technicians assigned");
-                  loadWO();
-                } catch (e) {
-                  message.error(
-                    e?.response?.data?.message || "Cannot assign technicians"
-                  );
-                }
-              }}
-            >
-              {technicians.map((t) => (
-                <Select.Option key={t._id} value={t._id}>
-                  {t.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </>
-        )}
-
         {role === "TECHNICIAN" &&
           status === "IN_PROGRESS" &&
           (wo.reviewRejections?.length > 0 ||
@@ -402,10 +445,88 @@ export default function WorkOrderDetail() {
             />
           )}
 
+        {wo.verification && (
+          <Alert
+            type="success"
+            showIcon
+            style={{ marginTop: 12 }}
+            message="Verified & Approved"
+            description={
+              <div>
+                <b>Verified at:</b>{" "}
+                {new Date(wo.verification.verifiedAt).toLocaleString()}
+              </div>
+            }
+          />
+        )}
+
+        <Divider />
+        <h3>Spare Parts Used</h3>
+
+        <UsedPartsEditor
+          parts={wo.usedParts || []}
+          inventory={mergedInventory}
+          disabled={!can("work", status, role)}
+          onChange={async (list) => {
+            const invalid = list.some(
+              (p) => !p.part || !p.quantity || p.quantity < 1
+            );
+            if (invalid) return;
+
+            const normalized = list.map((p) => ({
+              part: typeof p.part === "string" ? p.part : p.part?._id,
+              quantity: p.quantity,
+            }));
+
+            try {
+              await updateUsedParts(id, normalized);
+              await loadInventory();
+              message.success("Spare parts updated");
+              loadWO();
+            } catch (e) {
+              message.error(e?.response?.data?.message || "Update failed");
+            }
+          }}
+        />
+
+        {/* ===== ASSIGN TECHNICIANS ===== */}
+
+        <Divider />
+        <h3>Assigned Technicians</h3>
+        <Select
+          mode="multiple"
+          style={{ width: "100%" }}
+          value={selectedTechnicians}
+          disabled={!can("assign", status, role)}
+          onChange={async (values) => {
+            try {
+              await assignTechnicians(id, values);
+              message.success("Technicians assigned");
+              loadWO();
+            } catch (e) {
+              message.error(
+                e?.response?.data?.message || "Cannot assign technicians"
+              );
+            }
+          }}
+        >
+          {mergedTechnicians.map((t) => (
+            <Select.Option
+              key={t._id}
+              value={t._id}
+              disabled={t.status !== "ACTIVE"} // ❗ QUAN TRỌNG
+            >
+              {t.name}
+              {t.status !== "ACTIVE" && " (INACTIVE)"}
+            </Select.Option>
+          ))}
+        </Select>
+
         {/* ===== CHECKLIST ===== */}
         <Divider />
         <h3>Checklist</h3>
 
+        {/* ADMIN – APPLY TEMPLATE */}
         {role === "ADMIN" && status === "APPROVED" && (
           <Select
             style={{ width: "100%", marginBottom: 16 }}
@@ -416,9 +537,7 @@ export default function WorkOrderDetail() {
                 message.success("Checklist template applied");
                 loadWO();
               } catch (e) {
-                message.error(
-                  e?.response?.data?.message || "Cannot apply checklist"
-                );
+                message.error("Cannot apply checklist");
               }
             }}
           >
@@ -430,22 +549,33 @@ export default function WorkOrderDetail() {
           </Select>
         )}
 
-        {wo.checklist?.length > 0 ? (
-          <Checklist
-            data={wo.checklist}
-            disabled={!can("work", status, role)}
-            onSave={(list) =>
-              updateChecklist(id, list).then(() => {
-                message.success("Checklist saved");
-                loadWO();
-              })
-            }
-          />
-        ) : (
+        {/* ⚠️ TEMPLATE INACTIVE */}
+        {wo.checklistTemplate && role === "ADMIN" && (
           <Alert
             type="warning"
-            message="Checklist has not been applied"
             showIcon
+            message="Checklist template may be inactive"
+            description={`This checklist was created from template "${wo.checklistTemplate.name}". Template status does not affect this work order.`}
+            style={{ marginBottom: 12 }}
+          />
+        )}
+
+        {/* ✅ CHECKLIST HỢP LỆ */}
+        {wo.checklist?.length > 0 && (
+          <Checklist
+            data={wo.checklist}
+            disabled={!can("work", status, role) || checklistTemplateInactive}
+            onSave={async (list) => {
+              try {
+                await updateChecklist(id, list);
+                message.success("Checklist saved");
+                loadWO();
+              } catch (e) {
+                message.error(
+                  e?.response?.data?.message || "Cannot update checklist"
+                );
+              }
+            }}
           />
         )}
 
@@ -470,8 +600,12 @@ export default function WorkOrderDetail() {
           }}
         >
           {assets.map((a) => (
-            <Select.Option key={a._id} value={a._id}>
-              {a.name} ({a.code}) – {a.status}
+            <Select.Option
+              key={a._id}
+              value={a._id}
+              disabled={a.status !== "AVAILABLE"}
+            >
+              {a.name} ({a.code}){a.status !== "AVAILABLE" && ` - ${a.status}`}
             </Select.Option>
           ))}
         </Select>

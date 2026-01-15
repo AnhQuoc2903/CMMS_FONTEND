@@ -18,6 +18,7 @@ export default function Sidebar() {
     items.push({ key: "/technicians", label: "Technicians" });
     items.push({ key: "/tenant-requests", label: "Tenant Requests" });
     items.push({ key: "/checklist-templates", label: "Checklist Templates" });
+    items.push({ key: "/inventory-history", label: "Inventory History" });
   }
 
   return <Menu mode="inline" onClick={(e) => nav(e.key)} items={items} />;
