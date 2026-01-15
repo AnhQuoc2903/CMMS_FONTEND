@@ -75,3 +75,11 @@ export const getMyWorkOrderHistory = (id) =>
   api.get(`/work-orders/${id}/my-history`);
 export const updateUsedParts = (id, usedParts) =>
   api.patch(`/work-orders/${id}/used-parts`, { usedParts });
+
+export const cancelWorkOrder = (id, data) =>
+  api.post(`/work-orders/${id}/cancel`, data);
+
+export const holdWorkOrder = (id, data) =>
+  api.post(`/work-orders/${id}/hold`, data);
+
+export const resumeWorkOrder = (id) => api.post(`/work-orders/${id}/resume`);

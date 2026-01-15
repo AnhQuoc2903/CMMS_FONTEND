@@ -1,39 +1,71 @@
 export const can = (action, status, role) => {
-  const map = {
-    submit:
-      ["ADMIN", "MANAGER"].includes(role) &&
-      ["OPEN", "REJECTED"].includes(status),
+  switch (action) {
+    case "submit":
+      return (
+        ["ADMIN", "MANAGER"].includes(role) &&
+        ["OPEN", "REJECTED"].includes(status)
+      );
 
-    approve:
-      ["ADMIN", "MANAGER"].includes(role) && status === "PENDING_APPROVAL",
+    case "approve":
+    case "reject":
+      return (
+        ["ADMIN", "MANAGER"].includes(role) && status === "PENDING_APPROVAL"
+      );
 
-    reject:
-      ["ADMIN", "MANAGER"].includes(role) && status === "PENDING_APPROVAL",
+    case "assign":
+      return (
+        ["ADMIN", "MANAGER"].includes(role) &&
+        ["APPROVED", "ASSIGNED"].includes(status)
+      );
 
-    assign:
-      ["ADMIN", "MANAGER"].includes(role) &&
-      ["APPROVED", "ASSIGNED"].includes(status),
+    case "start":
+      return role === "TECHNICIAN" && status === "ASSIGNED";
 
-    start: role === "TECHNICIAN" && status === "ASSIGNED",
+    case "work":
+    case "useInventory":
+      return role === "TECHNICIAN" && status === "IN_PROGRESS";
 
-    work: role === "TECHNICIAN" && status === "IN_PROGRESS",
+    case "review":
+      return role === "MANAGER" && status === "COMPLETED";
 
-    useInventory: role === "TECHNICIAN" && status === "IN_PROGRESS",
+    case "reviewReject":
+      return role === "MANAGER" && status === "REVIEWED";
 
-    review: role === "MANAGER" && status === "COMPLETED",
+    case "verify":
+      return role === "ADMIN" && status === "REVIEWED";
 
-    reviewReject: role === "MANAGER" && status === "REVIEWED",
+    case "verifyReject":
+      return role === "ADMIN" && status === "VERIFIED";
 
-    verify: role === "ADMIN" && status === "REVIEWED",
+    case "close":
+      return ["ADMIN", "MANAGER"].includes(role) && status === "VERIFIED";
 
-    verifyReject: role === "ADMIN" && status === "VERIFIED",
+    case "editPriority":
+      return (
+        ["ADMIN", "MANAGER"].includes(role) &&
+        ["OPEN", "PENDING_APPROVAL", "APPROVED"].includes(status)
+      );
 
-    close: ["ADMIN", "MANAGER"].includes(role) && status === "VERIFIED",
+    /* ===== NEW: CANCEL / HOLD / RESUME ===== */
 
-    editPriority:
-      ["ADMIN", "MANAGER"].includes(role) &&
-      ["OPEN", "PENDING_APPROVAL", "APPROVED"].includes(status),
-  };
+    case "cancel":
+      return (
+        ["ADMIN", "MANAGER"].includes(role) &&
+        ["OPEN", "APPROVED", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(
+          status
+        )
+      );
 
-  return !!map[action];
+    case "hold":
+      return (
+        ["ADMIN", "MANAGER", "TECHNICIAN"].includes(role) &&
+        ["ASSIGNED", "IN_PROGRESS"].includes(status)
+      );
+
+    case "resume":
+      return status === "ON_HOLD";
+
+    default:
+      return false;
+  }
 };

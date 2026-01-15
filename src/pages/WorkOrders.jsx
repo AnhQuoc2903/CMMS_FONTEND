@@ -28,15 +28,26 @@ export default function WorkOrders() {
         {
           title: "Status",
           dataIndex: "status",
-          render: (s) => {
+          render: (s, r) => {
             let color = "blue";
 
+            if (s === "ON_HOLD") color = "orange";
+            if (s === "CANCELLED") color = "red";
             if (["COMPLETED", "CLOSED"].includes(s)) color = "green";
-            if (s === "IN_PROGRESS") color = "orange";
-            if (s === "REJECTED") color = "red";
-            if (s === "PENDING_APPROVAL") color = "gold";
+            if (s === "IN_PROGRESS") color = "gold";
+            if (s === "PENDING_APPROVAL") color = "purple";
 
-            return <Tag color={color}>{s}</Tag>;
+            return (
+              <>
+                <Tag color={color}>{s}</Tag>
+
+                {r.maintenancePlan && <Tag color="magenta">PM</Tag>}
+
+                {r.slaDueAt && new Date(r.slaDueAt) < new Date() && (
+                  <Tag color="red">SLA</Tag>
+                )}
+              </>
+            );
           },
         },
       ]}

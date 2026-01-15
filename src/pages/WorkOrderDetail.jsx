@@ -35,6 +35,9 @@ import {
   rejectVerification,
   getMyWorkOrderHistory,
   updateUsedParts,
+  cancelWorkOrder,
+  holdWorkOrder,
+  resumeWorkOrder,
 } from "../api/workOrder.api";
 
 import { getAssets } from "../api/asset.api";
@@ -48,6 +51,7 @@ import SignaturePad from "../components/SignaturePad";
 import { can } from "../utils/workOrderPermissions";
 import { useAuth } from "../auth/AuthContext";
 import UsedPartsEditor from "../components/UsedPartsEditor";
+import SLACountdown from "../components/SLACountdown";
 
 export default function WorkOrderDetail() {
   const { id } = useParams();
@@ -67,6 +71,26 @@ export default function WorkOrderDetail() {
   const [rejectType, setRejectType] = useState(null);
   const [history, setHistory] = useState([]);
   const [inventory, setInventory] = useState([]);
+  const [openHold, setOpenHold] = useState(false);
+  const [holdReason, setHoldReason] = useState("");
+
+  const [openCancel, setOpenCancel] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+
+  // 🔴 ADD
+  const STATUS_COLORS = {
+    OPEN: "default",
+    PENDING_APPROVAL: "gold",
+    APPROVED: "blue",
+    ASSIGNED: "cyan",
+    IN_PROGRESS: "orange",
+    ON_HOLD: "orange",
+    COMPLETED: "green",
+    REVIEWED: "blue",
+    VERIFIED: "green",
+    CLOSED: "green",
+    CANCELLED: "red",
+  };
 
   // "review" | "verify"
 
@@ -179,6 +203,8 @@ export default function WorkOrderDetail() {
 
   const hasChecklist = wo.checklist && wo.checklist.length > 0;
   const canStartWork = can("start", status, role) && hasChecklist;
+  const isBlocked =
+    status === "ON_HOLD" || status === "CANCELLED" || status === "CLOSED";
 
   const myTech = wo.assignedTechnicians?.find((t) => t._id === user?.id);
 
@@ -215,6 +241,24 @@ export default function WorkOrderDetail() {
             </>
           }
           style={{ marginBottom: 12 }}
+        />
+      )}
+
+      {status === "ON_HOLD" && (
+        <Alert
+          type="warning"
+          showIcon
+          message="Work Order is On Hold"
+          description={wo.holdReason}
+        />
+      )}
+
+      {status === "CANCELLED" && (
+        <Alert
+          type="error"
+          showIcon
+          message="Work Order Cancelled"
+          description={wo.cancelReason}
         />
       )}
 
@@ -286,7 +330,7 @@ export default function WorkOrderDetail() {
         )}
 
         <p>{wo.description}</p>
-        <Tag color="blue">{status}</Tag>
+        <Tag color={STATUS_COLORS[status]}>{status}</Tag>
         <Space style={{ marginTop: 8 }}>
           {can("editPriority", status, role) ? (
             <Select
@@ -425,6 +469,26 @@ export default function WorkOrderDetail() {
               Close Work Order
             </Button>
           )}
+          <Space wrap>
+            {can("hold", status, role) && (
+              <Button onClick={() => setOpenHold(true)}>Put On Hold</Button>
+            )}
+
+            {can("resume", status, role) && (
+              <Button
+                type="primary"
+                onClick={() => resumeWorkOrder(id).then(loadWO)}
+              >
+                Resume Work
+              </Button>
+            )}
+
+            {can("cancel", status, role) && (
+              <Button danger onClick={() => setOpenCancel(true)}>
+                Cancel Work Order
+              </Button>
+            )}
+          </Space>
         </Space>
 
         {/* ===== REVIEW / VERIFY INFO ===== */}
@@ -487,7 +551,7 @@ export default function WorkOrderDetail() {
         <UsedPartsEditor
           parts={wo.usedParts || []}
           inventory={mergedInventory}
-          disabled={!can("work", status, role)}
+          disabled={isBlocked || !can("work", status, role)}
           onChange={async (list) => {
             const invalid = list.some(
               (p) => !p.part || !p.quantity || p.quantity < 1
@@ -585,7 +649,11 @@ export default function WorkOrderDetail() {
         {wo.checklist?.length > 0 && (
           <Checklist
             data={wo.checklist}
-            disabled={!can("work", status, role) || checklistTemplateInactive}
+            disabled={
+              isBlocked ||
+              !can("work", status, role) ||
+              checklistTemplateInactive
+            }
             onSave={async (list) => {
               try {
                 await updateChecklist(id, list);
@@ -643,7 +711,7 @@ export default function WorkOrderDetail() {
           <UploadPhoto
             workOrderId={id}
             photos={wo.photos || []}
-            disabled={!can("work", status, role)}
+            disabled={isBlocked || !can("work", status, role)}
             onUploaded={loadWO}
           />
         </div>
@@ -651,7 +719,7 @@ export default function WorkOrderDetail() {
         {/* ===== SIGNATURE ===== */}
         <Divider />
         <h3>Signature</h3>
-        {can("work", status, role) ? (
+        {!isBlocked && can("work", status, role) ? (
           <SignaturePad onSave={handleSignatureSave} />
         ) : wo.signature?.url ? (
           <img
@@ -771,6 +839,53 @@ export default function WorkOrderDetail() {
           onChange={(e) => setRejectReason(e.target.value)}
         />
       </Modal>
+      <Modal
+        title="Put Work Order On Hold"
+        open={openHold}
+        onOk={async () => {
+          if (!holdReason.trim()) {
+            return message.error("Hold reason is required");
+          }
+
+          await holdWorkOrder(id, { reason: holdReason });
+          setOpenHold(false);
+          setHoldReason("");
+          loadWO();
+        }}
+        onCancel={() => setOpenHold(false)}
+      >
+        <Input.TextArea
+          rows={3}
+          placeholder="Reason..."
+          value={holdReason}
+          onChange={(e) => setHoldReason(e.target.value)}
+        />
+      </Modal>
+
+      <Modal
+        title="Cancel Work Order"
+        open={openCancel}
+        okButtonProps={{ danger: true }}
+        onOk={async () => {
+          if (!cancelReason.trim()) {
+            return message.error("Cancel reason is required");
+          }
+
+          await cancelWorkOrder(id, { reason: cancelReason });
+          setOpenCancel(false);
+          setCancelReason("");
+          loadWO();
+        }}
+      >
+        <Input.TextArea
+          rows={3}
+          placeholder="Reason..."
+          value={cancelReason}
+          onChange={(e) => setCancelReason(e.target.value)}
+        />
+      </Modal>
+
+      <SLACountdown dueAt={wo.slaDueAt} paused={status === "ON_HOLD"} />
     </>
   );
 }
