@@ -2,6 +2,7 @@ import { Table, Tag, Empty } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getWorkOrders } from "../api/workOrder.api";
+import { WORK_ORDER_STATUS } from "../constants/workOrderStatus";
 
 export default function WorkOrders() {
   const [data, setData] = useState([]);
@@ -28,18 +29,12 @@ export default function WorkOrders() {
         {
           title: "Status",
           dataIndex: "status",
-          render: (s, r) => {
-            let color = "blue";
-
-            if (s === "ON_HOLD") color = "orange";
-            if (s === "CANCELLED") color = "red";
-            if (["COMPLETED", "CLOSED"].includes(s)) color = "green";
-            if (s === "IN_PROGRESS") color = "gold";
-            if (s === "PENDING_APPROVAL") color = "purple";
+          render: (status, r) => {
+            const meta = WORK_ORDER_STATUS[status];
 
             return (
               <>
-                <Tag color={color}>{s}</Tag>
+                <Tag color={meta?.color}>{meta?.label}</Tag>
 
                 {r.maintenancePlan && <Tag color="magenta">PM</Tag>}
 

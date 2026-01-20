@@ -1,8 +1,14 @@
 import api from "./axios";
 
-export const getTenantRequests = () => api.get("/tenant");
+export const buildingApprove = (id, note) =>
+  api.post(`/tenant/${id}/building-approve`, { note });
 
-export const approveTenantRequest = (id) => api.patch(`/tenant/${id}/approve`);
+export const mspReview = (id, note) =>
+  api.post(`/tenant/${id}/msp-review`, { note });
+
+export const finalApprove = (id) => api.post(`/tenant/${id}/final-approve`);
 
 export const rejectTenantRequest = (id, reason) =>
-  api.patch(`/tenant/${id}/reject`, { reason });
+  api.post(`/tenant/${id}/reject`, { reason });
+
+export const getTenantRequests = () => api.get("/tenant");

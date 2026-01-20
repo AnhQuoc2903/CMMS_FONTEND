@@ -2,6 +2,10 @@ import api from "./axios";
 
 export const getMaintenancePlans = () => api.get("/maintenance-plans");
 
+// api/maintenancePlan.api.js
+export const getMaintenancePlanLogs = (id) =>
+  api.get(`/maintenance-plans/${id}/logs`);
+
 export const createMaintenancePlan = (data) =>
   api.post("/maintenance-plans", data);
 

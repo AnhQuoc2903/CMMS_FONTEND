@@ -1,24 +1,30 @@
 import { Select, InputNumber, Button, Space } from "antd";
 
+/**
+ * parts: [{ part: partId, quantity }]
+ * inventory: [{ _id, name, quantity, reservedQuantity, status }]
+ */
 export default function UsedPartsEditor({
-  parts,
-  inventory,
-  disabled,
+  parts = [],
+  inventory = [],
+  disabled = false,
   onChange,
 }) {
+  /* =============================
+     AVAILABLE = DB SOURCE OF TRUTH
+     ============================= */
+  const calcAvailable = (item) => {
+    return Math.max((item.quantity || 0) - (item.reservedQuantity || 0), 0);
+  };
+
+  /* =============================
+     ADD ROW
+     ============================= */
   const addRow = () => {
-    // 🔍 các part đã được chọn
-    const selectedIds = parts.map((p) =>
-      typeof p.part === "string" ? p.part : p.part?._id
-    );
-
-    // ✅ tìm part hợp lệ đầu tiên
     const availablePart = inventory.find(
-      (i) =>
-        i.status === "ACTIVE" && i.quantity > 0 && !selectedIds.includes(i._id)
+      (i) => i.status === "ACTIVE" && calcAvailable(i) > 0,
     );
 
-    // ❌ không còn part nào dùng được
     if (!availablePart) return;
 
     onChange([
@@ -30,54 +36,56 @@ export default function UsedPartsEditor({
     ]);
   };
 
-  const update = (idx, key, value) => {
-    const next = parts.map((p, i) => (i === idx ? { ...p, [key]: value } : p));
-    onChange(next);
-  };
+  /* =============================
+     UPDATE
+     ============================= */
 
   const remove = (idx) => {
     onChange(parts.filter((_, i) => i !== idx));
   };
 
+  /* =============================
+     RENDER
+     ============================= */
   return (
     <>
       {parts.map((p, idx) => {
-        // 🔥 các part đã chọn ở dòng khác
-        const selectedPartIds = parts
-          .filter((_, i) => i !== idx)
-          .map((x) => (typeof x.part === "string" ? x.part : x.part?._id));
-
         return (
-          <Space key={idx} style={{ marginBottom: 8 }}>
-            <Select
-              style={{ width: 260 }}
-              placeholder="Select spare part"
-              value={typeof p.part === "string" ? p.part : p.part?._id}
-              disabled={disabled}
-              onChange={(value) => update(idx, "part", value)}
-            >
-              {inventory.map((i) => (
-                <Select.Option
-                  key={i._id}
-                  value={i._id}
-                  disabled={
-                    i.status === "INACTIVE" || selectedPartIds.includes(i._id)
-                  }
-                >
-                  {i.name} (Stock: {i.quantity})
-                  {i.status === "INACTIVE" && " - INACTIVE"}
-                  {selectedPartIds.includes(i._id) && " - SELECTED"}
-                </Select.Option>
-              ))}
-            </Select>
+          <Space key={`${p.part}-${idx}`} style={{ marginBottom: 8 }}>
+            {/* ===== SELECT PART ===== */}
+            {disabled ? (
+              <span style={{ width: 280, display: "inline-block" }}></span>
+            ) : (
+              <Select
+                style={{ width: 280 }}
+                value={p.part}
+                onChange={(value) => {
+                  onChange(
+                    parts.map((row, i) =>
+                      i === idx ? { part: value, quantity: 1 } : row,
+                    ),
+                  );
+                }}
+              >
+                {inventory.map((i) => {
+                  const available = calcAvailable(i);
 
-            <InputNumber
-              min={1}
-              value={p.quantity}
-              disabled={disabled}
-              onChange={(v) => update(idx, "quantity", v)}
-            />
+                  return (
+                    <Select.Option
+                      key={i._id}
+                      value={i._id}
+                      disabled={i.status !== "ACTIVE" || available <= 0}
+                    >
+                      {i.name} (Available: {available})
+                    </Select.Option>
+                  );
+                })}
+              </Select>
+            )}
 
+            {/* ===== QUANTITY ===== */}
+
+            {/* ===== REMOVE ===== */}
             {!disabled && (
               <Button danger onClick={() => remove(idx)}>
                 Remove
@@ -87,6 +95,7 @@ export default function UsedPartsEditor({
         );
       })}
 
+      {/* ===== ADD BUTTON ===== */}
       {!disabled && (
         <Button type="dashed" onClick={addRow}>
           + Add Spare Part

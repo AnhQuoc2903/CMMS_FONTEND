@@ -100,14 +100,26 @@ export default function Inventory() {
           { title: "Name", dataIndex: "name" },
           { title: "SKU", dataIndex: "sku" },
           {
-            title: "Quantity",
+            title: "Total",
             dataIndex: "quantity",
-            render: (v, r) =>
-              v <= r.minStock ? (
-                <span style={{ color: "red", fontWeight: 600 }}>{v} ⚠ Low</span>
+          },
+          {
+            title: "Reserved",
+            dataIndex: "reservedQuantity",
+            render: (v) => v || 0,
+          },
+          {
+            title: "Available",
+            render: (_, r) => {
+              const available = r.quantity - (r.reservedQuantity || 0);
+              return available <= r.minStock ? (
+                <span style={{ color: "red", fontWeight: 600 }}>
+                  {available} ⚠ Low
+                </span>
               ) : (
-                <b>{v}</b>
-              ),
+                <b>{available}</b>
+              );
+            },
           },
 
           {
@@ -128,6 +140,7 @@ export default function Inventory() {
                 <Button
                   size="small"
                   type="primary"
+                  disabled={r.status !== "ACTIVE"}
                   onClick={() => {
                     setStockInPart(r);
                     setStockInQty(1);

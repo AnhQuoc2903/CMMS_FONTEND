@@ -3,13 +3,16 @@ import { Table, Button, Tag, Modal, Input, Space, message } from "antd";
 import { useEffect, useState } from "react";
 import {
   getTenantRequests,
-  approveTenantRequest,
+  buildingApprove,
+  mspReview,
+  finalApprove,
   rejectTenantRequest,
 } from "../api/tenant.api";
 
 const STATUS_COLOR = {
-  OPEN: "blue",
-  APPROVED: "green",
+  BUILDING_APPROVED: "cyan",
+  MSP_REVIEWED: "purple",
+  FINAL_APPROVED: "green",
   REJECTED: "red",
 };
 
@@ -31,12 +34,6 @@ export default function TenantRequests() {
   useEffect(() => {
     loadData();
   }, []);
-
-  const approve = async (id) => {
-    await approveTenantRequest(id);
-    message.success("Approved & Work Order created");
-    loadData();
-  };
 
   const reject = async () => {
     if (!rejectReason.trim()) {
@@ -91,25 +88,66 @@ export default function TenantRequests() {
             title: "Action",
             render: (_, r) => (
               <Space>
-                <Button
-                  type="primary"
-                  size="small"
-                  disabled={r.status !== "OPEN"}
-                  onClick={() => approve(r._id)}
-                >
-                  Approve
-                </Button>
-                <Button
-                  danger
-                  size="small"
-                  disabled={r.status !== "OPEN"}
-                  onClick={() => {
-                    setSelected(r);
-                    setOpenReject(true);
-                  }}
-                >
-                  Reject
-                </Button>
+                {/* BUILDING APPROVE */}
+                {r.status === "SUBMITTED" && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={async () => {
+                      await buildingApprove(r._id);
+                      message.success("Building approved");
+                      loadData();
+                    }}
+                  >
+                    Building Approve
+                  </Button>
+                )}
+
+                {/* MSP REVIEW */}
+                {r.status === "BUILDING_APPROVED" && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={async () => {
+                      await mspReview(r._id);
+                      message.success("MSP reviewed");
+                      loadData(); // ✅ BẮT BUỘC
+                    }}
+                  >
+                    MSP Review
+                  </Button>
+                )}
+
+                {/* FINAL APPROVE */}
+                {r.status === "MSP_REVIEWED" && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={async () => {
+                      await finalApprove(r._id);
+                      message.success("Work Order created");
+                      loadData();
+                    }}
+                  >
+                    Final Approve
+                  </Button>
+                )}
+
+                {/* REJECT (chung) */}
+                {["SUBMITTED", "BUILDING_APPROVED", "MSP_REVIEWED"].includes(
+                  r.status
+                ) && (
+                  <Button
+                    danger
+                    size="small"
+                    onClick={() => {
+                      setSelected(r);
+                      setOpenReject(true);
+                    }}
+                  >
+                    Reject
+                  </Button>
+                )}
               </Space>
             ),
           },

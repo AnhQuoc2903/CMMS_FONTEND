@@ -52,6 +52,13 @@ import { can } from "../utils/workOrderPermissions";
 import { useAuth } from "../auth/AuthContext";
 import UsedPartsEditor from "../components/UsedPartsEditor";
 import SLACountdown from "../components/SLACountdown";
+import {
+  ReviewModal,
+  RejectModal,
+  HoldModal,
+  CancelModal,
+} from "../components/WorkOrderModals";
+import { WORK_ORDER_STATUS } from "../constants/workOrderStatus";
 
 export default function WorkOrderDetail() {
   const { id } = useParams();
@@ -76,27 +83,23 @@ export default function WorkOrderDetail() {
 
   const [openCancel, setOpenCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [usedPartsDraft, setUsedPartsDraft] = useState([]);
+  const [isEditingParts, setIsEditingParts] = useState(false);
+  const [techDraft, setTechDraft] = useState([]);
+  const [assetDraft, setAssetDraft] = useState([]);
+  const [isEditingTech, setIsEditingTech] = useState(false);
+  const [isEditingAsset, setIsEditingAsset] = useState(false);
 
   // 🔴 ADD
-  const STATUS_COLORS = {
-    OPEN: "default",
-    PENDING_APPROVAL: "gold",
-    APPROVED: "blue",
-    ASSIGNED: "cyan",
-    IN_PROGRESS: "orange",
-    ON_HOLD: "orange",
-    COMPLETED: "green",
-    REVIEWED: "blue",
-    VERIFIED: "green",
-    CLOSED: "green",
-    CANCELLED: "red",
-  };
 
-  // "review" | "verify"
+  const statusMeta = WORK_ORDER_STATUS[status];
+  const statusGroup = WORK_ORDER_STATUS[status]?.group;
+  const canAssignByStatus = ["APPROVED", "ASSIGNED"].includes(status);
 
   /* ================= LOAD WORK ORDER ================= */
   const loadWO = async () => {
     const res = await getWorkOrderDetail(id);
+    setIsEditingParts(false);
     setWo(res.data);
   };
 
@@ -127,10 +130,44 @@ export default function WorkOrderDetail() {
   useEffect(() => {
     if (role === "ADMIN") {
       getChecklistTemplates().then((r) =>
-        setTemplates(r.data.filter((t) => t.isActive))
+        setTemplates(r.data.filter((t) => t.isActive)),
       );
     }
   }, [role]);
+
+  useEffect(() => {
+    if (!wo || isEditingParts) return;
+
+    setUsedPartsDraft(
+      (wo.usedParts || []).map((u) => ({
+        part: typeof u.part === "string" ? u.part : u.part?._id,
+        quantity: u.quantity,
+      })),
+    );
+  }, [wo, isEditingParts]);
+
+  useEffect(() => {
+    if (!wo) return;
+
+    setTechDraft(
+      wo.assignedTechnicians?.map((t) => (typeof t === "string" ? t : t._id)) ||
+        [],
+    );
+
+    setAssetDraft(
+      wo.assignedAssets?.map((a) => (typeof a === "string" ? a : a._id)) || [],
+    );
+  }, [wo]);
+
+  const isSame = !wo
+    ? true
+    : JSON.stringify(usedPartsDraft) ===
+      JSON.stringify(
+        (wo.usedParts || []).map((u) => ({
+          part: typeof u.part === "string" ? u.part : u.part?._id,
+          quantity: u.quantity,
+        })),
+      );
 
   useEffect(() => {
     if (role === "TECHNICIAN") {
@@ -140,36 +177,15 @@ export default function WorkOrderDetail() {
 
   useEffect(() => {
     if (role === "TECHNICIAN") {
-      getInventory({ status: "ACTIVE" }).then((r) => setInventory(r.data));
+      getInventory().then((r) => setInventory(r.data));
     }
   }, [role]);
 
   if (!wo) return null;
-  // ===== MERGE INVENTORY + USED PARTS (INACTIVE STILL VISIBLE) =====
-  const activeInventory = inventory;
-
-  const mergedInventory = [
-    ...activeInventory,
-    ...(wo.usedParts
-      ?.map((p) => p.part)
-      .filter((p) => p && !activeInventory.find((a) => a._id === p._id)) || []),
-  ];
-
-  const selectedAssets =
-    wo.assignedAssets?.map((a) => (typeof a === "string" ? a : a._id)) || [];
-
-  const selectedTechnicians =
-    wo.assignedTechnicians?.map((t) => (typeof t === "string" ? t : t._id)) ||
-    [];
-
-  const canAssignTechnician =
-    ["ADMIN", "MANAGER"].includes(role) &&
-    ["APPROVED", "ASSIGNED"].includes(status);
 
   const isPM = !!wo.maintenancePlan;
 
   /* ================= HANDLERS ================= */
-
   const handleSignatureSave = async (base64) => {
     await uploadSignature(id, base64);
     message.success("Work order completed");
@@ -197,29 +213,75 @@ export default function WorkOrderDetail() {
   const mergedTechnicians = [
     ...(wo.assignedTechnicians || []),
     ...technicians.filter(
-      (t) => !(wo.assignedTechnicians || []).find((a) => a._id === t._id)
+      (t) => !(wo.assignedTechnicians || []).find((a) => a._id === t._id),
     ),
   ];
 
   const hasChecklist = wo.checklist && wo.checklist.length > 0;
   const canStartWork = can("start", status, role) && hasChecklist;
-  const isBlocked =
-    status === "ON_HOLD" || status === "CANCELLED" || status === "CLOSED";
+  const isBlocked = [
+    "ON_HOLD",
+    "CANCELLED",
+    "CLOSED",
+    "REVIEWED",
+    "VERIFIED",
+  ].includes(status);
 
   const myTech = wo.assignedTechnicians?.find((t) => t._id === user?.id);
-
   const isInactiveTech = myTech && myTech.status !== "ACTIVE";
-
   const isTemplateInactive =
     wo.checklistTemplate &&
     !templates.some((t) => t._id === wo.checklistTemplate.templateId);
-
   const checklistTemplateInactive =
     wo.checklistTemplate && templates.length === 0;
 
   const loadInventory = async () => {
     const r = await getInventory({ status: "ACTIVE" });
     setInventory(r.data);
+  };
+
+  /* ================= MODAL HANDLERS ================= */
+  const handleReviewConfirm = async (note) => {
+    try {
+      await reviewWorkOrder(id, note);
+      message.success("Work order reviewed");
+      setOpenReview(false);
+      setReviewNote("");
+      loadWO();
+    } catch (e) {
+      message.error("Review failed");
+    }
+  };
+
+  const handleRejectConfirm = async (reason) => {
+    try {
+      if (rejectType === "review") {
+        await rejectReview(id, reason);
+      } else if (rejectType === "verify") {
+        await rejectVerification(id, reason);
+      }
+      message.success("Work order rejected");
+      setOpenReject(false);
+      setRejectReason("");
+      setRejectType(null);
+      loadWO();
+    } catch (e) {
+      message.error("Reject failed");
+    }
+  };
+
+  const handleHoldConfirm = async (reason) => {
+    await holdWorkOrder(id, { reason });
+    setOpenHold(false);
+    setHoldReason("");
+    loadWO();
+  };
+
+  const handleCancelConfirm = async (reason) => {
+    await cancelWorkOrder(id, { reason });
+    setOpenCancel(false);
+    setCancelReason("");
+    loadWO();
   };
 
   /* ================= UI ================= */
@@ -249,7 +311,16 @@ export default function WorkOrderDetail() {
           type="warning"
           showIcon
           message="Work Order is On Hold"
-          description={wo.holdReason}
+          description={
+            <>
+              <div>
+                <b>Reason:</b> {wo.holdReason}
+              </div>
+              <div>
+                <b>Hold at:</b> {new Date(wo.holdAt).toLocaleString()}
+              </div>
+            </>
+          }
         />
       )}
 
@@ -258,7 +329,16 @@ export default function WorkOrderDetail() {
           type="error"
           showIcon
           message="Work Order Cancelled"
-          description={wo.cancelReason}
+          description={
+            <>
+              <div>
+                <b>Reason:</b> {wo.cancelReason}
+              </div>
+              <div>
+                <b>Cancelled at:</b> {new Date(wo.cancelledAt).toLocaleString()}
+              </div>
+            </>
+          }
         />
       )}
 
@@ -330,7 +410,8 @@ export default function WorkOrderDetail() {
         )}
 
         <p>{wo.description}</p>
-        <Tag color={STATUS_COLORS[status]}>{status}</Tag>
+
+        <Tag color={statusMeta?.color}>{statusMeta?.label}</Tag>
         <Space style={{ marginTop: 8 }}>
           {can("editPriority", status, role) ? (
             <Select
@@ -343,7 +424,7 @@ export default function WorkOrderDetail() {
                   loadWO();
                 } catch (e) {
                   message.error(
-                    e?.response?.data?.message || "Cannot update priority"
+                    e?.response?.data?.message || "Cannot update priority",
                   );
                 }
               }}
@@ -394,7 +475,7 @@ export default function WorkOrderDetail() {
               danger
               onClick={() =>
                 rejectWorkOrder(id, { reason: "Rejected by manager" }).then(
-                  loadWO
+                  loadWO,
                 )
               }
             >
@@ -548,64 +629,90 @@ export default function WorkOrderDetail() {
         <Divider />
         <h3>Spare Parts Used</h3>
 
+        {wo.usedParts?.map((u) => (
+          <div key={u._id}>
+            {u.part?.name} x {u.quantity}{" "}
+            <Tag color={status === "IN_PROGRESS" ? "orange" : "green"}>
+              {status === "IN_PROGRESS" ? "Reserved" : "Consumed"}
+            </Tag>
+          </div>
+        ))}
+
         <UsedPartsEditor
-          parts={wo.usedParts || []}
-          inventory={mergedInventory}
+          parts={usedPartsDraft}
+          inventory={inventory}
           disabled={isBlocked || !can("work", status, role)}
-          onChange={async (list) => {
-            const invalid = list.some(
-              (p) => !p.part || !p.quantity || p.quantity < 1
-            );
-            if (invalid) return;
-
-            const normalized = list.map((p) => ({
-              part: typeof p.part === "string" ? p.part : p.part?._id,
-              quantity: p.quantity,
-            }));
-
-            try {
-              await updateUsedParts(id, normalized);
-              await loadInventory();
-              message.success("Spare parts updated");
-              loadWO();
-            } catch (e) {
-              message.error(e?.response?.data?.message || "Update failed");
-            }
+          onChange={(next) => {
+            setIsEditingParts(true);
+            setUsedPartsDraft(next);
           }}
         />
+
+        {status === "IN_PROGRESS" && can("work", status, role) && (
+          <Button
+            type="primary"
+            disabled={isSame}
+            style={{ marginTop: 12 }}
+            onClick={async () => {
+              try {
+                await updateUsedParts(id, usedPartsDraft);
+                setIsEditingParts(false); // ✅ RESET
+                await loadInventory();
+                message.success("Spare parts saved");
+                loadWO();
+              } catch (e) {
+                message.error(e?.response?.data?.message || "Save failed");
+              }
+            }}
+          >
+            Save Spare Parts
+          </Button>
+        )}
 
         {/* ===== ASSIGN TECHNICIANS ===== */}
 
         <Divider />
         <h3>Assigned Technicians</h3>
+
         <Select
           mode="multiple"
           style={{ width: "100%" }}
-          value={selectedTechnicians}
-          disabled={!can("assign", status, role)}
-          onChange={async (values) => {
-            try {
-              await assignTechnicians(id, values);
-              message.success("Technicians assigned");
-              loadWO();
-            } catch (e) {
-              message.error(
-                e?.response?.data?.message || "Cannot assign technicians"
-              );
-            }
+          value={techDraft}
+          disabled={!can("assign", status, role) || !canAssignByStatus}
+          onChange={(values) => {
+            setIsEditingTech(true);
+            setTechDraft(values);
           }}
         >
           {mergedTechnicians.map((t) => (
             <Select.Option
               key={t._id}
               value={t._id}
-              disabled={t.status !== "ACTIVE"} // ❗ QUAN TRỌNG
+              disabled={t.status !== "ACTIVE"}
             >
               {t.name}
               {t.status !== "ACTIVE" && " (INACTIVE)"}
             </Select.Option>
           ))}
         </Select>
+
+        <Button
+          type="primary"
+          style={{ marginTop: 8 }}
+          disabled={!isEditingTech}
+          onClick={async () => {
+            try {
+              await assignTechnicians(id, techDraft);
+              message.success("Technicians saved");
+              setIsEditingTech(false);
+              loadWO();
+            } catch (e) {
+              message.error(e?.response?.data?.message || "Save failed");
+            }
+          }}
+        >
+          Save Technicians
+        </Button>
 
         {/* ===== CHECKLIST ===== */}
         <Divider />
@@ -661,7 +768,7 @@ export default function WorkOrderDetail() {
                 loadWO();
               } catch (e) {
                 message.error(
-                  e?.response?.data?.message || "Cannot update checklist"
+                  e?.response?.data?.message || "Cannot update checklist",
                 );
               }
             }}
@@ -671,21 +778,15 @@ export default function WorkOrderDetail() {
         {/* ===== ASSETS ===== */}
         <Divider />
         <h3>Assigned Assets</h3>
+
         <Select
           mode="multiple"
           style={{ width: "100%" }}
-          value={selectedAssets}
-          disabled={isPM || !can("assign", status, role)}
-          onChange={async (values) => {
-            try {
-              await assignAssets(id, values);
-              message.success("Assets assigned");
-              loadWO();
-            } catch (e) {
-              message.error(
-                e?.response?.data?.message || "Cannot assign assets"
-              );
-            }
+          value={assetDraft}
+          disabled={isPM || !canAssignByStatus || !can("assign", status, role)}
+          onChange={(values) => {
+            setIsEditingAsset(true);
+            setAssetDraft(values);
           }}
         >
           {assets.map((a) => (
@@ -698,6 +799,24 @@ export default function WorkOrderDetail() {
             </Select.Option>
           ))}
         </Select>
+
+        <Button
+          type="primary"
+          style={{ marginTop: 8 }}
+          disabled={!isEditingAsset}
+          onClick={async () => {
+            try {
+              await assignAssets(id, assetDraft);
+              message.success("Assets saved");
+              setIsEditingAsset(false);
+              loadWO();
+            } catch (e) {
+              message.error(e?.response?.data?.message || "Save failed");
+            }
+          }}
+        >
+          Save Assets
+        </Button>
 
         {/* ===== PHOTOS ===== */}
         <Divider />
@@ -767,124 +886,45 @@ export default function WorkOrderDetail() {
           </>
         )}
       </Card>
-      <Modal
-        title="Review Work Order"
+      <ReviewModal
         open={openReview}
-        onCancel={() => {
+        onClose={() => {
           setOpenReview(false);
           setReviewNote("");
         }}
-        onOk={async () => {
-          if (!reviewNote.trim()) {
-            return message.error("Review note is required");
-          }
+        onConfirm={handleReviewConfirm}
+        note={reviewNote}
+        setNote={setReviewNote}
+      />
 
-          try {
-            await reviewWorkOrder(id, reviewNote);
-            message.success("Work order reviewed");
-            setOpenReview(false);
-            setReviewNote("");
-            loadWO();
-          } catch (e) {
-            message.error("Review failed");
-          }
-        }}
-        okText="Confirm Review"
-      >
-        <Input.TextArea
-          rows={4}
-          placeholder="Enter review note..."
-          value={reviewNote}
-          onChange={(e) => setReviewNote(e.target.value)}
-        />
-      </Modal>
-      <Modal
-        title="Reject Work Order"
+      <RejectModal
         open={openReject}
-        onCancel={() => {
+        onClose={() => {
           setOpenReject(false);
           setRejectReason("");
           setRejectType(null);
         }}
-        onOk={async () => {
-          if (!rejectReason.trim()) {
-            return message.error("Reject reason is required");
-          }
+        onConfirm={handleRejectConfirm}
+        reason={rejectReason}
+        setReason={setRejectReason}
+        type={rejectType}
+      />
 
-          try {
-            if (rejectType === "review") {
-              await rejectReview(id, rejectReason);
-            }
-
-            if (rejectType === "verify") {
-              await rejectVerification(id, rejectReason);
-            }
-
-            message.success("Work order rejected");
-            setOpenReject(false);
-            setRejectReason("");
-            setRejectType(null);
-            loadWO();
-          } catch (e) {
-            message.error("Reject failed");
-          }
-        }}
-        okText="Confirm Reject"
-        okButtonProps={{ danger: true }}
-      >
-        <Input.TextArea
-          rows={4}
-          placeholder="Enter reject reason..."
-          value={rejectReason}
-          onChange={(e) => setRejectReason(e.target.value)}
-        />
-      </Modal>
-      <Modal
-        title="Put Work Order On Hold"
+      <HoldModal
         open={openHold}
-        onOk={async () => {
-          if (!holdReason.trim()) {
-            return message.error("Hold reason is required");
-          }
+        onClose={() => setOpenHold(false)}
+        onConfirm={handleHoldConfirm}
+        reason={holdReason}
+        setReason={setHoldReason}
+      />
 
-          await holdWorkOrder(id, { reason: holdReason });
-          setOpenHold(false);
-          setHoldReason("");
-          loadWO();
-        }}
-        onCancel={() => setOpenHold(false)}
-      >
-        <Input.TextArea
-          rows={3}
-          placeholder="Reason..."
-          value={holdReason}
-          onChange={(e) => setHoldReason(e.target.value)}
-        />
-      </Modal>
-
-      <Modal
-        title="Cancel Work Order"
+      <CancelModal
         open={openCancel}
-        okButtonProps={{ danger: true }}
-        onOk={async () => {
-          if (!cancelReason.trim()) {
-            return message.error("Cancel reason is required");
-          }
-
-          await cancelWorkOrder(id, { reason: cancelReason });
-          setOpenCancel(false);
-          setCancelReason("");
-          loadWO();
-        }}
-      >
-        <Input.TextArea
-          rows={3}
-          placeholder="Reason..."
-          value={cancelReason}
-          onChange={(e) => setCancelReason(e.target.value)}
-        />
-      </Modal>
-
+        onClose={() => setOpenCancel(false)}
+        onConfirm={handleCancelConfirm}
+        reason={cancelReason}
+        setReason={setCancelReason}
+      />
       <SLACountdown dueAt={wo.slaDueAt} paused={status === "ON_HOLD"} />
     </>
   );

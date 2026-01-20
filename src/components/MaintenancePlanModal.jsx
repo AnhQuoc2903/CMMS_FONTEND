@@ -101,6 +101,7 @@ export default function MaintenancePlanModal({
             <Select.Option value="DAILY">Daily</Select.Option>
             <Select.Option value="WEEKLY">Weekly</Select.Option>
             <Select.Option value="MONTHLY">Monthly</Select.Option>
+            <Select.Option value="YEARLY">Yearly</Select.Option>
           </Select>
         </Form.Item>
 

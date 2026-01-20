@@ -14,6 +14,7 @@ import { getAssets } from "../api/asset.api";
 import { getChecklistTemplates } from "../api/checklistTemplate.api";
 
 import MaintenancePlanModal from "../components/MaintenancePlanModal";
+import PlanRunLogs from "../components/PlanRunLogs";
 
 /* ===== CHILD TABLE: WORK ORDERS ===== */
 const PlanWorkOrders = ({ planId }) => {
@@ -74,7 +75,7 @@ export default function MaintenancePlans() {
     load();
     getAssets().then((r) => setAssets(r.data));
     getChecklistTemplates().then((r) =>
-      setTemplates(r.data.filter((t) => t.isActive))
+      setTemplates(r.data.filter((t) => t.isActive)),
     );
   }, []);
 
@@ -89,7 +90,15 @@ export default function MaintenancePlans() {
         dataSource={data}
         style={{ marginTop: 16 }}
         expandable={{
-          expandedRowRender: (record) => <PlanWorkOrders planId={record._id} />,
+          expandedRowRender: (record) => (
+            <>
+              <h4>Generated Work Orders</h4>
+              <PlanWorkOrders planId={record._id} />
+
+              <h4 style={{ marginTop: 16 }}>Run History</h4>
+              <PlanRunLogs planId={record._id} />
+            </>
+          ),
         }}
         columns={[
           { title: "Name", dataIndex: "name" },

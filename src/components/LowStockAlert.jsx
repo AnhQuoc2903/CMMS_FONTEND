@@ -9,7 +9,7 @@ export default function LowStockAlert({ reload }) {
     getLowStock().then((res) => setData(res.data));
   }, [reload]); // 👈 QUAN TRỌNG
 
-  if (!data.length) return null; // ❗ không có thì không hiện
+  if (!data.length) return null;
 
   return (
     <Alert
@@ -20,15 +20,21 @@ export default function LowStockAlert({ reload }) {
         <List
           size="small"
           dataSource={data}
-          renderItem={(item) => (
-            <List.Item>
-              <b>{item.name}</b>
-              <Tag color="red" style={{ marginLeft: 8 }}>
-                {item.quantity} left
-              </Tag>
-              <span style={{ marginLeft: 8 }}>(Min: {item.minStock})</span>
-            </List.Item>
-          )}
+          renderItem={(item) => {
+            const available = item.quantity - (item.reservedQuantity || 0);
+
+            return (
+              <List.Item>
+                <b>{item.name}</b>
+
+                <Tag color="red" style={{ marginLeft: 8 }}>
+                  {available} available
+                </Tag>
+
+                <span style={{ marginLeft: 8 }}>(Min: {item.minStock})</span>
+              </List.Item>
+            );
+          }}
         />
       }
     />
