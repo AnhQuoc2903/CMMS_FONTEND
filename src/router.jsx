@@ -13,6 +13,7 @@ import TenantRequestForm from "./pages/TenantRequestForm";
 import ChecklistTemplates from "./pages/ChecklistTemplates";
 import InventoryHistory from "./pages/InventoryHistory";
 import MaintenancePlans from "./pages/MaintenancePlans";
+import { ROLES } from "./constants/roles";
 
 export default function Router() {
   return (
@@ -78,7 +79,9 @@ export default function Router() {
           <Route
             path="/technicians"
             element={
-              <ProtectedRoute roles={["ADMIN", "MANAGER"]}>
+              <ProtectedRoute
+                roles={[ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER]}
+              >
                 <Technicians />
               </ProtectedRoute>
             }
@@ -86,7 +89,9 @@ export default function Router() {
           <Route
             path="/checklist-templates"
             element={
-              <ProtectedRoute roles={["ADMIN", "MANAGER"]}>
+              <ProtectedRoute
+                roles={[ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER]}
+              >
                 <ChecklistTemplates />
               </ProtectedRoute>
             }
@@ -94,7 +99,13 @@ export default function Router() {
           <Route
             path="/tenant-requests"
             element={
-              <ProtectedRoute roles={["ADMIN", "MANAGER"]}>
+              <ProtectedRoute
+                roles={[
+                  ROLES.SUPER_ADMIN,
+                  ROLES.BUILDING_MANAGER,
+                  ROLES.MSP_SUPERVISOR,
+                ]}
+              >
                 <TenantRequest />
               </ProtectedRoute>
             }
@@ -102,7 +113,9 @@ export default function Router() {
           <Route
             path="/inventory-history"
             element={
-              <ProtectedRoute roles={["ADMIN", "MANAGER"]}>
+              <ProtectedRoute
+                roles={[ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER]}
+              >
                 <InventoryHistory />
               </ProtectedRoute>
             }
@@ -110,7 +123,9 @@ export default function Router() {
           <Route
             path="/maintenance-plans"
             element={
-              <ProtectedRoute roles={["ADMIN", "MANAGER"]}>
+              <ProtectedRoute
+                roles={[ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER]}
+              >
                 <MaintenancePlans />
               </ProtectedRoute>
             }

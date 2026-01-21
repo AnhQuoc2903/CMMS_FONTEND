@@ -1,69 +1,75 @@
+import { ROLES } from "../constants/roles";
+
 export const can = (action, status, role) => {
   switch (action) {
+    /* ================= CREATE / SUBMIT ================= */
     case "submit":
       return (
-        ["ADMIN", "MANAGER"].includes(role) &&
+        [ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER].includes(role) &&
         ["OPEN", "REJECTED"].includes(status)
       );
 
+    /* ================= APPROVAL ================= */
     case "approve":
     case "reject":
       return (
-        ["ADMIN", "MANAGER"].includes(role) && status === "PENDING_APPROVAL"
+        [ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER].includes(role) &&
+        status === "PENDING_APPROVAL"
       );
 
+    /* ================= ASSIGN ================= */
     case "assign":
       return (
-        ["ADMIN", "MANAGER"].includes(role) &&
-        ["APPROVED", "ASSIGNED"].includes(status)
+        role === ROLES.SUPER_ADMIN && ["APPROVED", "ASSIGNED"].includes(status)
       );
 
+    /* ================= TECHNICIAN FLOW ================= */
     case "start":
-      return role === "TECHNICIAN" && status === "ASSIGNED";
+      return role === ROLES.TECHNICIAN && status === "ASSIGNED";
 
     case "work":
-    case "useInventory":
-      return role === "TECHNICIAN" && status === "IN_PROGRESS";
-
-    case "review":
-      return role === "MANAGER" && status === "COMPLETED";
-
-    case "reviewReject":
-      return role === "MANAGER" && status === "REVIEWED";
-
-    case "verify":
-      return role === "ADMIN" && status === "REVIEWED";
-
-    case "verifyReject":
-      return role === "ADMIN" && status === "VERIFIED";
-
-    case "close":
-      return ["ADMIN", "MANAGER"].includes(role) && status === "VERIFIED";
-
-    case "editPriority":
-      return (
-        ["ADMIN", "MANAGER"].includes(role) &&
-        ["OPEN", "PENDING_APPROVAL", "APPROVED"].includes(status)
-      );
-
-    /* ===== NEW: CANCEL / HOLD / RESUME ===== */
-
-    case "cancel":
-      return (
-        ["ADMIN", "MANAGER"].includes(role) &&
-        ["OPEN", "APPROVED", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(
-          status
-        )
-      );
+      return role === ROLES.TECHNICIAN && status === "IN_PROGRESS";
 
     case "hold":
-      return (
-        ["ADMIN", "MANAGER", "TECHNICIAN"].includes(role) &&
-        ["ASSIGNED", "IN_PROGRESS"].includes(status)
-      );
+      return role === ROLES.TECHNICIAN && status === "IN_PROGRESS";
 
     case "resume":
-      return status === "ON_HOLD";
+      return role === ROLES.TECHNICIAN && status === "ON_HOLD";
+
+    /* ================= REVIEW ================= */
+    case "review":
+      return role === ROLES.MSP_SUPERVISOR && status === "COMPLETED";
+
+    case "reviewReject":
+      return role === ROLES.MSP_SUPERVISOR && status === "REVIEWED";
+
+    /* ================= VERIFY ================= */
+    case "verify":
+      return role === ROLES.SUPER_ADMIN && status === "REVIEWED";
+
+    case "verifyReject":
+      return role === ROLES.SUPER_ADMIN && status === "VERIFIED";
+
+    /* ================= CLOSE ================= */
+    case "close":
+      return (
+        [ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER].includes(role) &&
+        status === "VERIFIED"
+      );
+
+    /* ================= EDIT META ================= */
+    case "editPriority":
+      return (
+        [ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER].includes(role) &&
+        ["OPEN", "PENDING_APPROVAL", "APPROVED", "ASSIGNED"].includes(status)
+      );
+
+    /* ================= CANCEL ================= */
+    case "cancel":
+      return (
+        [ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER].includes(role) &&
+        ["OPEN", "PENDING_APPROVAL", "APPROVED", "ASSIGNED"].includes(status)
+      );
 
     default:
       return false;

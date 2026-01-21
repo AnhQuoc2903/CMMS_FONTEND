@@ -9,8 +9,6 @@ import {
   Select,
   Space,
   Alert,
-  Modal,
-  Input,
 } from "antd";
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -59,6 +57,7 @@ import {
   CancelModal,
 } from "../components/WorkOrderModals";
 import { WORK_ORDER_STATUS } from "../constants/workOrderStatus";
+import { ROLES } from "../constants/roles";
 
 export default function WorkOrderDetail() {
   const { id } = useParams();
@@ -106,7 +105,7 @@ export default function WorkOrderDetail() {
   useEffect(() => {
     loadWO();
 
-    if (["ADMIN", "MANAGER"].includes(role)) {
+    if ([ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER].includes(role)) {
       getTechnicians().then((r) => setTechnicians(r.data));
     }
   }, [id, role]);
@@ -128,7 +127,7 @@ export default function WorkOrderDetail() {
   }, [wo]);
 
   useEffect(() => {
-    if (role === "ADMIN") {
+    if (role === "SUPER_ADMIN") {
       getChecklistTemplates().then((r) =>
         setTemplates(r.data.filter((t) => t.isActive)),
       );
@@ -719,7 +718,7 @@ export default function WorkOrderDetail() {
         <h3>Checklist</h3>
 
         {/* ADMIN – APPLY TEMPLATE */}
-        {role === "ADMIN" && status === "APPROVED" && !isPM && (
+        {role === "SUPER_ADMIN" && status === "APPROVED" && !isPM && (
           <Select
             style={{ width: "100%", marginBottom: 16 }}
             placeholder="Apply checklist template"
@@ -742,7 +741,7 @@ export default function WorkOrderDetail() {
         )}
 
         {/* ⚠️ TEMPLATE INACTIVE */}
-        {wo.checklistTemplate && role === "ADMIN" && (
+        {wo.checklistTemplate && role === "SUPER_ADMIN" && (
           <Alert
             type="warning"
             showIcon
