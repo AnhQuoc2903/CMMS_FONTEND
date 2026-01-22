@@ -9,6 +9,7 @@ import {
   Select,
   Space,
   Alert,
+  Tabs,
 } from "antd";
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -36,6 +37,8 @@ import {
   cancelWorkOrder,
   holdWorkOrder,
   resumeWorkOrder,
+  getWorkOrderTimeline,
+  getWorkOrderSLATimeline,
 } from "../api/workOrder.api";
 
 import { getAssets } from "../api/asset.api";
@@ -58,6 +61,8 @@ import {
 } from "../components/WorkOrderModals";
 import { WORK_ORDER_STATUS } from "../constants/workOrderStatus";
 import { ROLES } from "../constants/roles";
+import WorkOrderTimeline from "../components/WorkOrderTimeline";
+import SLATimeline from "../components/SLATimeline";
 
 export default function WorkOrderDetail() {
   const { id } = useParams();
@@ -88,11 +93,12 @@ export default function WorkOrderDetail() {
   const [assetDraft, setAssetDraft] = useState([]);
   const [isEditingTech, setIsEditingTech] = useState(false);
   const [isEditingAsset, setIsEditingAsset] = useState(false);
-
-  // 🔴 ADD
+  const [timeline, setTimeline] = useState([]);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
+  const [slaTimeline, setSLATimeline] = useState([]);
+  const [loadingSLA, setLoadingSLA] = useState(false);
 
   const statusMeta = WORK_ORDER_STATUS[status];
-  const statusGroup = WORK_ORDER_STATUS[status]?.group;
   const canAssignByStatus = ["APPROVED", "ASSIGNED"].includes(status);
 
   /* ================= LOAD WORK ORDER ================= */
@@ -180,6 +186,33 @@ export default function WorkOrderDetail() {
     }
   }, [role]);
 
+  useEffect(() => {
+    if (!id || ![ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER].includes(role))
+      return;
+
+    setLoadingSLA(true);
+    getWorkOrderSLATimeline(id)
+      .then((r) => setSLATimeline(r.data))
+      .finally(() => setLoadingSLA(false));
+  }, [id, role]);
+
+  useEffect(() => {
+    if (
+      !id ||
+      ![
+        ROLES.SUPER_ADMIN,
+        ROLES.BUILDING_MANAGER,
+        ROLES.MSP_SUPERVISOR,
+      ].includes(role)
+    )
+      return;
+
+    setLoadingTimeline(true);
+    getWorkOrderTimeline(id)
+      .then((r) => setTimeline(r.data))
+      .finally(() => setLoadingTimeline(false));
+  }, [id, role]);
+
   if (!wo) return null;
 
   const isPM = !!wo.maintenancePlan;
@@ -217,7 +250,9 @@ export default function WorkOrderDetail() {
   ];
 
   const hasChecklist = wo.checklist && wo.checklist.length > 0;
-  const canStartWork = can("start", status, role) && hasChecklist;
+  const slaBlocked = wo.sla?.breached;
+  const canStartWork =
+    can("start", status, role) && hasChecklist && !slaBlocked;
   const isBlocked = [
     "ON_HOLD",
     "CANCELLED",
@@ -351,538 +386,638 @@ export default function WorkOrderDetail() {
           )
         }
       >
-        {wo.assignedTechnicians?.some((t) => t.status === "INACTIVE") && (
-          <Alert
-            type="warning"
-            showIcon
-            message="This work order contains INACTIVE technicians"
-            style={{ marginBottom: 12 }}
-          />
-        )}
+        <Tabs
+          items={[
+            {
+              key: "detail",
+              label: "Details",
+              children: (
+                <>
+                  {wo.assignedTechnicians?.some(
+                    (t) => t.status === "INACTIVE",
+                  ) && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message="This work order contains INACTIVE technicians"
+                      style={{ marginBottom: 12 }}
+                    />
+                  )}
 
-        {status === "CLOSED" && (
-          <Alert
-            type="info"
-            message="Work order is closed and read-only"
-            showIcon
-            className="mb-3"
-          />
-        )}
+                  {status === "CLOSED" && (
+                    <Alert
+                      type="info"
+                      message="Work order is closed and read-only"
+                      showIcon
+                      className="mb-3"
+                    />
+                  )}
 
-        {checklistTemplateInactive && (
-          <Alert
-            type="warning"
-            showIcon
-            message="Checklist template is INACTIVE"
-            description="This checklist was created from an inactive template and cannot be modified."
-            style={{ marginBottom: 12 }}
-          />
-        )}
+                  {checklistTemplateInactive && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message="Checklist template is INACTIVE"
+                      description="This checklist was created from an inactive template and cannot be modified."
+                      style={{ marginBottom: 12 }}
+                    />
+                  )}
 
-        {isInactiveTech && (
-          <Alert
-            type="error"
-            showIcon
-            message="Your technician account is INACTIVE"
-            description="You cannot update checklist or perform work."
-            style={{ marginBottom: 12 }}
-          />
-        )}
+                  {isInactiveTech && (
+                    <Alert
+                      type="error"
+                      showIcon
+                      message="Your technician account is INACTIVE"
+                      description="You cannot update checklist or perform work."
+                      style={{ marginBottom: 12 }}
+                    />
+                  )}
 
-        {isTemplateInactive && (
-          <Alert
-            type="warning"
-            showIcon
-            message="Checklist template is INACTIVE"
-            description="Checklist is read-only."
-            style={{ marginBottom: 12 }}
-          />
-        )}
+                  {isTemplateInactive && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message="Checklist template is INACTIVE"
+                      description="Checklist is read-only."
+                      style={{ marginBottom: 12 }}
+                    />
+                  )}
 
-        {wo.dueAt && new Date() > new Date(wo.dueAt) && (
-          <Alert
-            type="error"
-            showIcon
-            message="SLA VIOLATED (Overdue)"
-            style={{ marginBottom: 12 }}
-          />
-        )}
-
-        <p>{wo.description}</p>
-
-        <Tag color={statusMeta?.color}>{statusMeta?.label}</Tag>
-        <Space style={{ marginTop: 8 }}>
-          {can("editPriority", status, role) ? (
-            <Select
-              value={wo.priority}
-              style={{ width: 160 }}
-              onChange={async (value) => {
-                try {
-                  await updatePriority(id, value);
-                  message.success("Priority updated");
-                  loadWO();
-                } catch (e) {
-                  message.error(
-                    e?.response?.data?.message || "Cannot update priority",
-                  );
-                }
-              }}
-            >
-              {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((p) => (
-                <Select.Option key={p} value={p}>
-                  <Tag color={PRIORITY_COLORS[p]}>{p}</Tag>
-                </Select.Option>
-              ))}
-            </Select>
-          ) : (
-            <Tag color={PRIORITY_COLORS[wo.priority]}>{wo.priority}</Tag>
-          )}
-
-          {wo.slaHours && <Tag color="blue">SLA: {wo.slaHours}h</Tag>}
-        </Space>
-
-        {wo.dueAt && (
-          <p style={{ marginTop: 8 }}>
-            Due at: <b>{new Date(wo.dueAt).toLocaleString()}</b>
-          </p>
-        )}
-
-        {wo.dueAt && new Date() > new Date(wo.dueAt) && (
-          <Alert type="error" message="OVERDUE (SLA violated)" showIcon />
-        )}
-
-        {/* ===== ACTION BUTTONS ===== */}
-        <Divider />
-        <Space wrap>
-          {can("submit", status, role) && (
-            <Button onClick={() => submitWorkOrder(id).then(loadWO)}>
-              Submit for Approval
-            </Button>
-          )}
-
-          {can("approve", status, role) && (
-            <Button
-              type="primary"
-              onClick={() => approveWorkOrder(id).then(loadWO)}
-            >
-              Approve
-            </Button>
-          )}
-
-          {can("reject", status, role) && (
-            <Button
-              danger
-              onClick={() =>
-                rejectWorkOrder(id, { reason: "Rejected by manager" }).then(
-                  loadWO,
-                )
-              }
-            >
-              Reject
-            </Button>
-          )}
-
-          {can("review", status, role) && (
-            <Button type="primary" onClick={() => setOpenReview(true)}>
-              Review
-            </Button>
-          )}
-
-          {can("verify", status, role) && (
-            <Button
-              type="primary"
-              onClick={() => verifyWorkOrder(id).then(loadWO)}
-            >
-              Verify
-            </Button>
-          )}
-
-          {can("reviewReject", status, role) && (
-            <Button
-              danger
-              onClick={() => {
-                setRejectType("review");
-                setOpenReject(true);
-              }}
-            >
-              Reject Review
-            </Button>
-          )}
-
-          {can("verifyReject", status, role) && (
-            <Button
-              danger
-              onClick={() => {
-                setRejectType("verify");
-                setOpenReject(true);
-              }}
-            >
-              Reject Verification
-            </Button>
-          )}
-
-          {can("start", status, role) && !hasChecklist && (
-            <Alert
-              type="error"
-              showIcon
-              message="Checklist is required before starting work"
-              style={{ marginBottom: 12 }}
-            />
-          )}
-
-          {can("start", status, role) && (
-            <Button
-              type="primary"
-              disabled={!canStartWork}
-              onClick={async () => {
-                await startWorkOrder(id);
-                message.success("Work started");
-                loadWO();
-              }}
-            >
-              Start Work
-            </Button>
-          )}
-
-          {can("close", status, role) && (
-            <Button danger onClick={() => closeWorkOrder(id).then(loadWO)}>
-              Close Work Order
-            </Button>
-          )}
-          <Space wrap>
-            {can("hold", status, role) && (
-              <Button onClick={() => setOpenHold(true)}>Put On Hold</Button>
-            )}
-
-            {can("resume", status, role) && (
-              <Button
-                type="primary"
-                onClick={() => resumeWorkOrder(id).then(loadWO)}
-              >
-                Resume Work
-              </Button>
-            )}
-
-            {can("cancel", status, role) && (
-              <Button danger onClick={() => setOpenCancel(true)}>
-                Cancel Work Order
-              </Button>
-            )}
-          </Space>
-        </Space>
-
-        {/* ===== REVIEW / VERIFY INFO ===== */}
-        <Divider />
-
-        {wo.review && (
-          <Alert
-            type="info"
-            showIcon
-            style={{ marginTop: 16 }}
-            message="Reviewed"
-            description={
-              <>
-                <div>
-                  <b>Note:</b> {wo.review.note || "-"}
-                </div>
-                <div>
-                  <b>Reviewed at:</b>{" "}
-                  {new Date(wo.review.reviewedAt).toLocaleString()}
-                </div>
-              </>
-            }
-          />
-        )}
-
-        {role === "TECHNICIAN" &&
-          status === "IN_PROGRESS" &&
-          (wo.reviewRejections?.length > 0 ||
-            wo.verificationRejections?.length > 0) && (
-            <Alert
-              type="error"
-              showIcon
-              message="This work order was rejected and requires rework"
-              description={
-                wo.reviewRejections?.at(-1)?.reason ||
-                wo.verificationRejections?.at(-1)?.reason
-              }
-              style={{ marginBottom: 12 }}
-            />
-          )}
-
-        {wo.verification && (
-          <Alert
-            type="success"
-            showIcon
-            style={{ marginTop: 12 }}
-            message="Verified & Approved"
-            description={
-              <div>
-                <b>Verified at:</b>{" "}
-                {new Date(wo.verification.verifiedAt).toLocaleString()}
-              </div>
-            }
-          />
-        )}
-
-        <Divider />
-        <h3>Spare Parts Used</h3>
-
-        {wo.usedParts?.map((u) => (
-          <div key={u._id}>
-            {u.part?.name} x {u.quantity}{" "}
-            <Tag color={status === "IN_PROGRESS" ? "orange" : "green"}>
-              {status === "IN_PROGRESS" ? "Reserved" : "Consumed"}
-            </Tag>
-          </div>
-        ))}
-
-        <UsedPartsEditor
-          parts={usedPartsDraft}
-          inventory={inventory}
-          disabled={isBlocked || !can("work", status, role)}
-          onChange={(next) => {
-            setIsEditingParts(true);
-            setUsedPartsDraft(next);
-          }}
-        />
-
-        {status === "IN_PROGRESS" && can("work", status, role) && (
-          <Button
-            type="primary"
-            disabled={isSame}
-            style={{ marginTop: 12 }}
-            onClick={async () => {
-              try {
-                await updateUsedParts(id, usedPartsDraft);
-                setIsEditingParts(false); // ✅ RESET
-                await loadInventory();
-                message.success("Spare parts saved");
-                loadWO();
-              } catch (e) {
-                message.error(e?.response?.data?.message || "Save failed");
-              }
-            }}
-          >
-            Save Spare Parts
-          </Button>
-        )}
-
-        {/* ===== ASSIGN TECHNICIANS ===== */}
-
-        <Divider />
-        <h3>Assigned Technicians</h3>
-
-        <Select
-          mode="multiple"
-          style={{ width: "100%" }}
-          value={techDraft}
-          disabled={!can("assign", status, role) || !canAssignByStatus}
-          onChange={(values) => {
-            setIsEditingTech(true);
-            setTechDraft(values);
-          }}
-        >
-          {mergedTechnicians.map((t) => (
-            <Select.Option
-              key={t._id}
-              value={t._id}
-              disabled={t.status !== "ACTIVE"}
-            >
-              {t.name}
-              {t.status !== "ACTIVE" && " (INACTIVE)"}
-            </Select.Option>
-          ))}
-        </Select>
-
-        <Button
-          type="primary"
-          style={{ marginTop: 8 }}
-          disabled={!isEditingTech}
-          onClick={async () => {
-            try {
-              await assignTechnicians(id, techDraft);
-              message.success("Technicians saved");
-              setIsEditingTech(false);
-              loadWO();
-            } catch (e) {
-              message.error(e?.response?.data?.message || "Save failed");
-            }
-          }}
-        >
-          Save Technicians
-        </Button>
-
-        {/* ===== CHECKLIST ===== */}
-        <Divider />
-        <h3>Checklist</h3>
-
-        {/* ADMIN – APPLY TEMPLATE */}
-        {role === "SUPER_ADMIN" && status === "APPROVED" && !isPM && (
-          <Select
-            style={{ width: "100%", marginBottom: 16 }}
-            placeholder="Apply checklist template"
-            onChange={async (templateId) => {
-              try {
-                await applyChecklistTemplate(id, templateId);
-                message.success("Checklist template applied");
-                loadWO();
-              } catch (e) {
-                message.error("Cannot apply checklist");
-              }
-            }}
-          >
-            {templates.map((t) => (
-              <Select.Option key={t._id} value={t._id}>
-                {t.name}
-              </Select.Option>
-            ))}
-          </Select>
-        )}
-
-        {/* ⚠️ TEMPLATE INACTIVE */}
-        {wo.checklistTemplate && role === "SUPER_ADMIN" && (
-          <Alert
-            type="warning"
-            showIcon
-            message="Checklist template may be inactive"
-            description={`This checklist was created from template "${wo.checklistTemplate.name}". Template status does not affect this work order.`}
-            style={{ marginBottom: 12 }}
-          />
-        )}
-
-        {/* ✅ CHECKLIST HỢP LỆ */}
-        {wo.checklist?.length > 0 && (
-          <Checklist
-            data={wo.checklist}
-            disabled={
-              isBlocked ||
-              !can("work", status, role) ||
-              checklistTemplateInactive
-            }
-            onSave={async (list) => {
-              try {
-                await updateChecklist(id, list);
-                message.success("Checklist saved");
-                loadWO();
-              } catch (e) {
-                message.error(
-                  e?.response?.data?.message || "Cannot update checklist",
-                );
-              }
-            }}
-          />
-        )}
-
-        {/* ===== ASSETS ===== */}
-        <Divider />
-        <h3>Assigned Assets</h3>
-
-        <Select
-          mode="multiple"
-          style={{ width: "100%" }}
-          value={assetDraft}
-          disabled={isPM || !canAssignByStatus || !can("assign", status, role)}
-          onChange={(values) => {
-            setIsEditingAsset(true);
-            setAssetDraft(values);
-          }}
-        >
-          {assets.map((a) => (
-            <Select.Option
-              key={a._id}
-              value={a._id}
-              disabled={a.status !== "AVAILABLE"}
-            >
-              {a.name} ({a.code}){a.status !== "AVAILABLE" && ` - ${a.status}`}
-            </Select.Option>
-          ))}
-        </Select>
-
-        <Button
-          type="primary"
-          style={{ marginTop: 8 }}
-          disabled={!isEditingAsset}
-          onClick={async () => {
-            try {
-              await assignAssets(id, assetDraft);
-              message.success("Assets saved");
-              setIsEditingAsset(false);
-              loadWO();
-            } catch (e) {
-              message.error(e?.response?.data?.message || "Save failed");
-            }
-          }}
-        >
-          Save Assets
-        </Button>
-
-        {/* ===== PHOTOS ===== */}
-        <Divider />
-        <h3>Photos</h3>
-
-        <div
-          style={{
-            minHeight: 170, // ❗ QUAN TRỌNG
-          }}
-        >
-          <UploadPhoto
-            workOrderId={id}
-            photos={wo.photos || []}
-            disabled={isBlocked || !can("work", status, role)}
-            onUploaded={loadWO}
-          />
-        </div>
-
-        {/* ===== SIGNATURE ===== */}
-        <Divider />
-        <h3>Signature</h3>
-        {!isBlocked && can("work", status, role) ? (
-          <SignaturePad onSave={handleSignatureSave} />
-        ) : wo.signature?.url ? (
-          <img
-            src={wo.signature.url}
-            alt="signature"
-            style={{
-              width: 400,
-              height: 150,
-              objectFit: "contain",
-              display: "block",
-            }}
-          />
-        ) : (
-          <p>No signature</p>
-        )}
-
-        {role === "TECHNICIAN" && history.length > 0 && (
-          <>
-            <Divider />
-            <h3>Work History</h3>
-            {history.map((h) => (
-              <Alert
-                key={h._id}
-                type={h.action === "REWORK" ? "error" : "info"}
-                showIcon
-                message={h.action}
-                description={
-                  <>
-                    <div>
-                      <b>By:</b> {h.performedBy?.name} ({h.performedBy?.role})
-                    </div>
-                    <div>
-                      <b>Time:</b> {new Date(h.createdAt).toLocaleString()}
-                    </div>
-                    {h.note && (
-                      <div>
-                        <b>Reason:</b> {h.note}
-                      </div>
+                  {wo.sla?.breached &&
+                    !["CLOSED", "CANCELLED"].includes(status) && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message="SLA VIOLATED (Overdue)"
+                        style={{ marginBottom: 12 }}
+                      />
                     )}
-                  </>
-                }
-                style={{ marginBottom: 8 }}
-              />
-            ))}
-          </>
+
+                  <p>{wo.description}</p>
+
+                  <Tag color={statusMeta?.color}>{statusMeta?.label}</Tag>
+                  <Space style={{ marginTop: 8 }}>
+                    {can("editPriority", status, role) ? (
+                      <Select
+                        value={wo.priority}
+                        style={{ width: 160 }}
+                        onChange={async (value) => {
+                          try {
+                            await updatePriority(id, value);
+                            message.success("Priority updated");
+                            loadWO();
+                          } catch (e) {
+                            message.error(
+                              e?.response?.data?.message ||
+                                "Cannot update priority",
+                            );
+                          }
+                        }}
+                      >
+                        {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((p) => (
+                          <Select.Option key={p} value={p}>
+                            <Tag color={PRIORITY_COLORS[p]}>{p}</Tag>
+                          </Select.Option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <Tag color={PRIORITY_COLORS[wo.priority]}>
+                        {wo.priority}
+                      </Tag>
+                    )}
+
+                    {wo.slaHours && (
+                      <Tag
+                        color="blue"
+                        title="SLA is calculated automatically based on priority and starts when the work order is approved"
+                      >
+                        SLA: {wo.slaHours}h
+                      </Tag>
+                    )}
+                  </Space>
+
+                  {wo.slaStartAt && (
+                    <p style={{ marginTop: 4 }}>
+                      SLA Start at:{" "}
+                      <b>{new Date(wo.slaStartAt).toLocaleString()}</b>
+                    </p>
+                  )}
+
+                  {wo.slaDueAt && (
+                    <p style={{ marginTop: 8 }}>
+                      SLA Due at:{" "}
+                      <b>{new Date(wo.slaDueAt).toLocaleString()}</b>
+                    </p>
+                  )}
+
+                  {wo.slaDueAt && (
+                    <>
+                      {wo.sla?.breached ? (
+                        <Tag color="red">SLA Overdue</Tag>
+                      ) : wo.status === "ON_HOLD" ? (
+                        <Tag color="orange">SLA Paused</Tag>
+                      ) : (
+                        <Tag color="green">Within SLA</Tag>
+                      )}
+                    </>
+                  )}
+
+                  {/* ===== ACTION BUTTONS ===== */}
+                  <Divider />
+                  <Space wrap>
+                    {can("submit", status, role) && (
+                      <Button onClick={() => submitWorkOrder(id).then(loadWO)}>
+                        Submit for Approval
+                      </Button>
+                    )}
+
+                    {can("approve", status, role) && (
+                      <Button
+                        type="primary"
+                        onClick={() => approveWorkOrder(id).then(loadWO)}
+                      >
+                        Approve
+                      </Button>
+                    )}
+
+                    {can("reject", status, role) && (
+                      <Button
+                        danger
+                        onClick={() =>
+                          rejectWorkOrder(id, {
+                            reason: "Rejected by manager",
+                          }).then(loadWO)
+                        }
+                      >
+                        Reject
+                      </Button>
+                    )}
+
+                    {can("review", status, role) && (
+                      <Button
+                        type="primary"
+                        onClick={() => setOpenReview(true)}
+                      >
+                        Review
+                      </Button>
+                    )}
+
+                    {can("verify", status, role) && (
+                      <Button
+                        type="primary"
+                        onClick={() => verifyWorkOrder(id).then(loadWO)}
+                      >
+                        Verify
+                      </Button>
+                    )}
+
+                    {can("reviewReject", status, role) && (
+                      <Button
+                        danger
+                        onClick={() => {
+                          setRejectType("review");
+                          setOpenReject(true);
+                        }}
+                      >
+                        Reject Review
+                      </Button>
+                    )}
+
+                    {can("verifyReject", status, role) && (
+                      <Button
+                        danger
+                        onClick={() => {
+                          setRejectType("verify");
+                          setOpenReject(true);
+                        }}
+                      >
+                        Reject Verification
+                      </Button>
+                    )}
+
+                    {can("start", status, role) && !hasChecklist && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message="Checklist is required before starting work"
+                        style={{ marginBottom: 12 }}
+                      />
+                    )}
+
+                    {can("start", status, role) && (
+                      <Button
+                        type="primary"
+                        disabled={!canStartWork}
+                        onClick={async () => {
+                          await startWorkOrder(id);
+                          message.success("Work started");
+                          loadWO();
+                        }}
+                      >
+                        Start Work
+                      </Button>
+                    )}
+
+                    {can("close", status, role) && (
+                      <Button
+                        danger
+                        onClick={() => closeWorkOrder(id).then(loadWO)}
+                      >
+                        Close Work Order
+                      </Button>
+                    )}
+                    <Space wrap>
+                      {can("hold", status, role) && (
+                        <Button onClick={() => setOpenHold(true)}>
+                          Put On Hold
+                        </Button>
+                      )}
+
+                      {can("resume", status, role) && (
+                        <Button
+                          type="primary"
+                          onClick={() => resumeWorkOrder(id).then(loadWO)}
+                        >
+                          Resume Work
+                        </Button>
+                      )}
+
+                      {can("cancel", status, role) && (
+                        <Button danger onClick={() => setOpenCancel(true)}>
+                          Cancel Work Order
+                        </Button>
+                      )}
+                    </Space>
+                  </Space>
+
+                  {/* ===== REVIEW / VERIFY INFO ===== */}
+                  <Divider />
+
+                  {wo.review && (
+                    <Alert
+                      type="info"
+                      showIcon
+                      style={{ marginTop: 16 }}
+                      message="Reviewed"
+                      description={
+                        <>
+                          <div>
+                            <b>Note:</b> {wo.review.note || "-"}
+                          </div>
+                          <div>
+                            <b>Reviewed at:</b>{" "}
+                            {new Date(wo.review.reviewedAt).toLocaleString()}
+                          </div>
+                        </>
+                      }
+                    />
+                  )}
+
+                  {role === "TECHNICIAN" &&
+                    status === "IN_PROGRESS" &&
+                    (wo.reviewRejections?.length > 0 ||
+                      wo.verificationRejections?.length > 0) && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message="This work order was rejected and requires rework"
+                        description={
+                          wo.reviewRejections?.at(-1)?.reason ||
+                          wo.verificationRejections?.at(-1)?.reason
+                        }
+                        style={{ marginBottom: 12 }}
+                      />
+                    )}
+
+                  {wo.verification && (
+                    <Alert
+                      type="success"
+                      showIcon
+                      style={{ marginTop: 12 }}
+                      message="Verified & Approved"
+                      description={
+                        <div>
+                          <b>Verified at:</b>{" "}
+                          {new Date(
+                            wo.verification.verifiedAt,
+                          ).toLocaleString()}
+                        </div>
+                      }
+                    />
+                  )}
+
+                  <Divider />
+                  <h3>Spare Parts Used</h3>
+
+                  {wo.usedParts?.map((u) => (
+                    <div key={u._id}>
+                      {u.part?.name} x {u.quantity}{" "}
+                      <Tag
+                        color={status === "IN_PROGRESS" ? "orange" : "green"}
+                      >
+                        {status === "IN_PROGRESS" ? "Reserved" : "Consumed"}
+                      </Tag>
+                    </div>
+                  ))}
+
+                  <UsedPartsEditor
+                    parts={usedPartsDraft}
+                    inventory={inventory}
+                    disabled={isBlocked || !can("work", status, role)}
+                    onChange={(next) => {
+                      setIsEditingParts(true);
+                      setUsedPartsDraft(next);
+                    }}
+                  />
+
+                  {status === "IN_PROGRESS" && can("work", status, role) && (
+                    <Button
+                      type="primary"
+                      disabled={isSame}
+                      style={{ marginTop: 12 }}
+                      onClick={async () => {
+                        try {
+                          await updateUsedParts(id, usedPartsDraft);
+                          setIsEditingParts(false); // ✅ RESET
+                          await loadInventory();
+                          message.success("Spare parts saved");
+                          loadWO();
+                        } catch (e) {
+                          message.error(
+                            e?.response?.data?.message || "Save failed",
+                          );
+                        }
+                      }}
+                    >
+                      Save Spare Parts
+                    </Button>
+                  )}
+
+                  {/* ===== ASSIGN TECHNICIANS ===== */}
+
+                  <Divider />
+                  <h3>Assigned Technicians</h3>
+
+                  <Select
+                    mode="multiple"
+                    style={{ width: "100%" }}
+                    value={techDraft}
+                    disabled={
+                      !can("assign", status, role) || !canAssignByStatus
+                    }
+                    onChange={(values) => {
+                      setIsEditingTech(true);
+                      setTechDraft(values);
+                    }}
+                  >
+                    {mergedTechnicians.map((t) => (
+                      <Select.Option
+                        key={t._id}
+                        value={t._id}
+                        disabled={t.status !== "ACTIVE"}
+                      >
+                        {t.name}
+                        {t.status !== "ACTIVE" && " (INACTIVE)"}
+                      </Select.Option>
+                    ))}
+                  </Select>
+
+                  <Button
+                    type="primary"
+                    style={{ marginTop: 8 }}
+                    disabled={!isEditingTech}
+                    onClick={async () => {
+                      try {
+                        await assignTechnicians(id, techDraft);
+                        message.success("Technicians saved");
+                        setIsEditingTech(false);
+                        loadWO();
+                      } catch (e) {
+                        message.error(
+                          e?.response?.data?.message || "Save failed",
+                        );
+                      }
+                    }}
+                  >
+                    Save Technicians
+                  </Button>
+
+                  {/* ===== CHECKLIST ===== */}
+                  <Divider />
+                  <h3>Checklist</h3>
+
+                  {/* ADMIN – APPLY TEMPLATE */}
+                  {role === "SUPER_ADMIN" && status === "APPROVED" && !isPM && (
+                    <Select
+                      style={{ width: "100%", marginBottom: 16 }}
+                      placeholder="Apply checklist template"
+                      onChange={async (templateId) => {
+                        try {
+                          await applyChecklistTemplate(id, templateId);
+                          message.success("Checklist template applied");
+                          loadWO();
+                        } catch (e) {
+                          message.error("Cannot apply checklist");
+                        }
+                      }}
+                    >
+                      {templates.map((t) => (
+                        <Select.Option key={t._id} value={t._id}>
+                          {t.name}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                  )}
+
+                  {/* ⚠️ TEMPLATE INACTIVE */}
+                  {wo.checklistTemplate && role === "SUPER_ADMIN" && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message="Checklist template may be inactive"
+                      description={`This checklist was created from template "${wo.checklistTemplate.name}". Template status does not affect this work order.`}
+                      style={{ marginBottom: 12 }}
+                    />
+                  )}
+
+                  {/* ✅ CHECKLIST HỢP LỆ */}
+                  {wo.checklist?.length > 0 && (
+                    <Checklist
+                      data={wo.checklist}
+                      disabled={
+                        isBlocked ||
+                        !can("work", status, role) ||
+                        checklistTemplateInactive
+                      }
+                      onSave={async (list) => {
+                        try {
+                          await updateChecklist(id, list);
+                          message.success("Checklist saved");
+                          loadWO();
+                        } catch (e) {
+                          message.error(
+                            e?.response?.data?.message ||
+                              "Cannot update checklist",
+                          );
+                        }
+                      }}
+                    />
+                  )}
+
+                  {/* ===== ASSETS ===== */}
+                  <Divider />
+                  <h3>Assigned Assets</h3>
+
+                  <Select
+                    mode="multiple"
+                    style={{ width: "100%" }}
+                    value={assetDraft}
+                    disabled={
+                      isPM || !canAssignByStatus || !can("assign", status, role)
+                    }
+                    onChange={(values) => {
+                      setIsEditingAsset(true);
+                      setAssetDraft(values);
+                    }}
+                  >
+                    {assets.map((a) => (
+                      <Select.Option
+                        key={a._id}
+                        value={a._id}
+                        disabled={a.status !== "AVAILABLE"}
+                      >
+                        {a.name} ({a.code})
+                        {a.status !== "AVAILABLE" && ` - ${a.status}`}
+                      </Select.Option>
+                    ))}
+                  </Select>
+
+                  <Button
+                    type="primary"
+                    style={{ marginTop: 8 }}
+                    disabled={!isEditingAsset}
+                    onClick={async () => {
+                      try {
+                        await assignAssets(id, assetDraft);
+                        message.success("Assets saved");
+                        setIsEditingAsset(false);
+                        loadWO();
+                      } catch (e) {
+                        message.error(
+                          e?.response?.data?.message || "Save failed",
+                        );
+                      }
+                    }}
+                  >
+                    Save Assets
+                  </Button>
+
+                  {/* ===== PHOTOS ===== */}
+                  <Divider />
+                  <h3>Photos</h3>
+
+                  <div
+                    style={{
+                      minHeight: 170, // ❗ QUAN TRỌNG
+                    }}
+                  >
+                    <UploadPhoto
+                      workOrderId={id}
+                      photos={wo.photos || []}
+                      disabled={isBlocked || !can("work", status, role)}
+                      onUploaded={loadWO}
+                    />
+                  </div>
+
+                  {/* ===== SIGNATURE ===== */}
+                  <Divider />
+                  <h3>Signature</h3>
+                  {!isBlocked && can("work", status, role) ? (
+                    <SignaturePad onSave={handleSignatureSave} />
+                  ) : wo.signature?.url ? (
+                    <img
+                      src={wo.signature.url}
+                      alt="signature"
+                      style={{
+                        width: 400,
+                        height: 150,
+                        objectFit: "contain",
+                        display: "block",
+                      }}
+                    />
+                  ) : (
+                    <p>No signature</p>
+                  )}
+
+                  {role === "TECHNICIAN" && history.length > 0 && (
+                    <>
+                      <Divider />
+                      <h3>Work History</h3>
+                      {history.map((h) => (
+                        <Alert
+                          key={h._id}
+                          type={h.action === "REWORK" ? "error" : "info"}
+                          showIcon
+                          message={h.action}
+                          description={
+                            <>
+                              <div>
+                                <b>By:</b> {h.performedBy?.name} (
+                                {h.performedBy?.role})
+                              </div>
+                              <div>
+                                <b>Time:</b>{" "}
+                                {new Date(h.createdAt).toLocaleString()}
+                              </div>
+                              {h.note && (
+                                <div>
+                                  <b>Reason:</b> {h.note}
+                                </div>
+                              )}
+                            </>
+                          }
+                          style={{ marginBottom: 8 }}
+                        />
+                      ))}
+                    </>
+                  )}
+                </>
+              ),
+            },
+            ...([
+              ROLES.SUPER_ADMIN,
+              ROLES.BUILDING_MANAGER,
+              ROLES.MSP_SUPERVISOR,
+            ].includes(role)
+              ? [
+                  {
+                    key: "timeline",
+                    label: "Timeline",
+                    children: (
+                      <WorkOrderTimeline
+                        data={timeline}
+                        loading={loadingTimeline}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+            ...([ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER].includes(role)
+              ? [
+                  {
+                    key: "sla",
+                    label: "SLA Timeline",
+                    children: (
+                      <SLATimeline data={slaTimeline} loading={loadingSLA} />
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
+        <Divider />
+        {!["CLOSED", "CANCELLED"].includes(status) && (
+          <SLACountdown dueAt={wo.slaDueAt} paused={wo.status === "ON_HOLD"} />
         )}
       </Card>
       <ReviewModal
@@ -924,7 +1059,6 @@ export default function WorkOrderDetail() {
         reason={cancelReason}
         setReason={setCancelReason}
       />
-      <SLACountdown dueAt={wo.slaDueAt} paused={status === "ON_HOLD"} />
     </>
   );
 }

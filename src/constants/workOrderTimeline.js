@@ -1,0 +1,17 @@
+export const ACTION_LABEL = {
+  CREATE: "Work order created",
+  SUBMIT: "Submitted for approval",
+  APPROVE: "Approved",
+  REJECT: "Rejected",
+  ASSIGN_TECHNICIAN: "Technician assigned",
+  ASSIGN_ASSET: "Asset assigned",
+  START: "Work started",
+  COMPLETE: "Completed by technician",
+  REVIEW: "Reviewed by MSP Supervisor",
+  VERIFY: "Verified by Building Manager",
+  CLOSE: "Closed",
+  HOLD: "Work on hold",
+  RESUME: "Work resumed",
+  CANCEL: "Cancelled",
+  REWORK: "Sent back for rework",
+};

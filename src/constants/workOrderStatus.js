@@ -1,7 +1,11 @@
 export const WORK_ORDER_STATUS = {
   OPEN: { label: "Draft", color: "default", group: "DRAFT" },
   PENDING_APPROVAL: { label: "Pending", color: "gold", group: "PENDING" },
-  APPROVED: { label: "Approved", color: "blue", group: "PENDING" },
+  APPROVED: {
+    label: "Approved (Waiting Assignment)",
+    color: "blue",
+    group: "READY",
+  },
   ASSIGNED: { label: "Assigned", color: "cyan", group: "ASSIGNED" },
 
   IN_PROGRESS: { label: "Started", color: "orange", group: "IN_PROGRESS" },

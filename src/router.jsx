@@ -13,6 +13,8 @@ import TenantRequestForm from "./pages/TenantRequestForm";
 import ChecklistTemplates from "./pages/ChecklistTemplates";
 import InventoryHistory from "./pages/InventoryHistory";
 import MaintenancePlans from "./pages/MaintenancePlans";
+import SLADashboard from "./pages/SLADashboard";
+import SLATechnicianRanking from "./pages/SLATechnicianRanking";
 import { ROLES } from "./constants/roles";
 
 export default function Router() {
@@ -127,6 +129,26 @@ export default function Router() {
                 roles={[ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER]}
               >
                 <MaintenancePlans />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/sla"
+            element={
+              <ProtectedRoute
+                roles={[ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER]}
+              >
+                <SLADashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sla/technicians"
+            element={
+              <ProtectedRoute
+                roles={[ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER]}
+              >
+                <SLATechnicianRanking />
               </ProtectedRoute>
             }
           />

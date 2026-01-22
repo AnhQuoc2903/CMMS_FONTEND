@@ -24,6 +24,8 @@ export default function Sidebar() {
     items.push({ key: "/checklist-templates", label: "Checklist Templates" });
     items.push({ key: "/inventory-history", label: "Inventory History" });
     items.push({ key: "/maintenance-plans", label: "Maintenance Plans" });
+    items.push({ key: "/reports/sla", label: "SLA Dashboard" });
+    items.push({ key: "/sla/technicians", label: "SLA Technician Ranking" });
   }
 
   if (user?.role === ROLES.MSP_SUPERVISOR) {

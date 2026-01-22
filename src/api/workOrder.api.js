@@ -83,3 +83,9 @@ export const holdWorkOrder = (id, data) =>
   api.post(`/work-orders/${id}/hold`, data);
 
 export const resumeWorkOrder = (id) => api.post(`/work-orders/${id}/resume`);
+
+export const getWorkOrderTimeline = (id) =>
+  api.get(`/work-orders/${id}/timeline`);
+
+export const getWorkOrderSLATimeline = (id) =>
+  api.get(`/work-orders/${id}/sla-timeline`);
