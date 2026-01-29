@@ -1,7 +1,7 @@
 import { Card, Form, Input, Button } from "antd";
 import { loginApi } from "../api/auth.api";
 import { useAuth } from "../auth/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 export default function Login() {
   const { login } = useAuth();
@@ -22,6 +22,9 @@ export default function Login() {
         <Form.Item name="password" label="Password" required>
           <Input.Password />
         </Form.Item>
+        <div className="text-right mb-4">
+          <Link to="/forgot-password">Forgot password?</Link>
+        </div>
         <Button type="primary" htmlType="submit" block>
           Login
         </Button>

@@ -16,12 +16,16 @@ import MaintenancePlans from "./pages/MaintenancePlans";
 import SLADashboard from "./pages/SLADashboard";
 import SLATechnicianRanking from "./pages/SLATechnicianRanking";
 import { ROLES } from "./constants/roles";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 export default function Router() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/request" element={<TenantRequestForm />} />
 
         <Route element={<MainLayout />}>

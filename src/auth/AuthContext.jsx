@@ -1,5 +1,6 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 
 const AuthContext = createContext();
@@ -7,7 +8,11 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const token = localStorage.getItem("token");
-    return token ? jwtDecode(token) : null;
+    try {
+      return token ? jwtDecode(token) : null;
+    } catch {
+      return null;
+    }
   });
 
   const login = (token) => {
@@ -19,6 +24,12 @@ export const AuthProvider = ({ children }) => {
     localStorage.clear();
     setUser(null);
   };
+
+  useEffect(() => {
+    if (user?.exp && user.exp * 1000 < Date.now()) {
+      logout();
+    }
+  }, [user]);
 
   return (
     <AuthContext.Provider value={{ user, login, logout }}>

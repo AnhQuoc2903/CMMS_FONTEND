@@ -251,8 +251,7 @@ export default function WorkOrderDetail() {
 
   const hasChecklist = wo.checklist && wo.checklist.length > 0;
   const slaBlocked = wo.sla?.breached;
-  const canStartWork =
-    can("start", status, role) && hasChecklist && !slaBlocked;
+  const canStartWork = can("start", status, role) && hasChecklist;
   const isBlocked = [
     "ON_HOLD",
     "CANCELLED",

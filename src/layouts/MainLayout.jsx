@@ -1,13 +1,15 @@
-import { Layout, Menu } from "antd";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Layout, Menu, Button, Modal, Form, Input, message } from "antd";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ROLES } from "../constants/roles";
+import { changePasswordApi } from "../api/auth.api";
 
 const { Header, Sider, Content } = Layout;
 
 export default function MainLayout() {
   const nav = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
+  const { user, logout } = useAuth();
 
   const items = [
     { key: "/", label: "Dashboard" },
@@ -37,6 +39,91 @@ export default function MainLayout() {
     items.push({ key: "/tenant-requests", label: "Tenant Requests" });
   }
 
+  const handleLogout = () => {
+    Modal.confirm({
+      title: "Confirm logout",
+      content: "Are you sure you want to logout?",
+      okText: "Logout",
+      okType: "danger",
+      cancelText: "Cancel",
+      onOk: () => {
+        logout();
+        nav("/login");
+      },
+    });
+  };
+
+  const handleChangePassword = () => {
+    Modal.confirm({
+      title: "Change Password",
+      icon: null,
+      content: (
+        <Form
+          layout="vertical"
+          id="change-password-form"
+          onFinish={async (values) => {
+            try {
+              await changePasswordApi(values);
+              message.success("Password changed successfully");
+
+              // 👉 Logout luôn cho an toàn
+              logout();
+              nav("/login");
+            } catch (err) {
+              message.error(
+                err?.response?.data?.message || "Change password failed",
+              );
+            }
+          }}
+        >
+          <Form.Item
+            name="oldPassword"
+            label="Old password"
+            rules={[{ required: true }]}
+          >
+            <Input.Password />
+          </Form.Item>
+
+          <Form.Item
+            name="newPassword"
+            label="New password"
+            rules={[{ required: true, min: 6 }]}
+          >
+            <Input.Password />
+          </Form.Item>
+
+          <Form.Item
+            name="confirm"
+            label="Confirm new password"
+            dependencies={["newPassword"]}
+            rules={[
+              { required: true },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue("newPassword") === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error("Passwords do not match"));
+                },
+              }),
+            ]}
+          >
+            <Input.Password />
+          </Form.Item>
+        </Form>
+      ),
+      okText: "Change password",
+      okType: "primary",
+      cancelText: "Cancel",
+      onOk: () =>
+        document
+          .getElementById("change-password-form")
+          .dispatchEvent(
+            new Event("submit", { cancelable: true, bubbles: true }),
+          ),
+    });
+  };
+
   return (
     <Layout className="min-h-screen">
       <Sider width={220} className="bg-white">
@@ -49,8 +136,16 @@ export default function MainLayout() {
       </Sider>
 
       <Layout>
-        <Header className="bg-white shadow px-6 flex items-center">
+        <Header className="bg-white shadow px-6 flex items-center justify-between">
           <h1 className="text-lg font-semibold">CMMS System – {user?.role}</h1>
+
+          <div className="flex gap-2">
+            <Button onClick={handleChangePassword}>Change password</Button>
+
+            <Button danger onClick={handleLogout}>
+              Logout
+            </Button>
+          </div>
         </Header>
 
         <Content className="p-6 bg-gray-50">
