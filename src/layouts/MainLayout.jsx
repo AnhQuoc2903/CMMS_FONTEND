@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ROLES } from "../constants/roles";
 import { changePasswordApi } from "../api/auth.api";
+import NotificationBell from "../components/NotificationBell";
 
 const { Header, Sider, Content } = Layout;
 
@@ -31,6 +32,7 @@ export default function MainLayout() {
       { key: "/maintenance-plans", label: "Maintenance Plans" },
       { key: "/reports/sla", label: "SLA Dashboard" },
       { key: "/sla/technicians", label: "SLA Technician Ranking" },
+      { key: "/notifications", label: "Notifications" },
     );
   }
 
@@ -129,7 +131,7 @@ export default function MainLayout() {
       <Sider width={220} className="bg-white">
         <Menu
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[`/${location.pathname.split("/")[1]}`]}
           onClick={(e) => nav(e.key)}
           items={items}
         />
@@ -139,7 +141,11 @@ export default function MainLayout() {
         <Header className="bg-white shadow px-6 flex items-center justify-between">
           <h1 className="text-lg font-semibold">CMMS System – {user?.role}</h1>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-4">
+            <div style={{ float: "right", marginRight: 16 }}>
+              <NotificationBell />
+            </div>
+
             <Button onClick={handleChangePassword}>Change password</Button>
 
             <Button danger onClick={handleLogout}>

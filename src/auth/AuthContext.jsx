@@ -1,7 +1,8 @@
-/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
+import { connectSocket, disconnectSocket } from "../socket";
 
 const AuthContext = createContext();
 
@@ -15,13 +16,24 @@ export const AuthProvider = ({ children }) => {
     }
   });
 
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token && user) {
+      connectSocket(token);
+    }
+  }, []);
+
   const login = (token) => {
     localStorage.setItem("token", token);
-    setUser(jwtDecode(token));
+    const decoded = jwtDecode(token);
+    setUser(decoded);
+
+    connectSocket(token); // ✅ CONNECT SOCKET
   };
 
   const logout = () => {
     localStorage.clear();
+    disconnectSocket(); // ✅ DISCONNECT SOCKET
     setUser(null);
   };
 

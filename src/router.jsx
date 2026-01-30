@@ -18,6 +18,7 @@ import SLATechnicianRanking from "./pages/SLATechnicianRanking";
 import { ROLES } from "./constants/roles";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import NotificationsPage from "./pages/Notifications";
 
 export default function Router() {
   return (
@@ -34,6 +35,15 @@ export default function Router() {
             element={
               <ProtectedRoute>
                 <WorkOrders />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationsPage />
               </ProtectedRoute>
             }
           />
