@@ -97,6 +97,7 @@ export default function WorkOrderDetail() {
   const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [slaTimeline, setSLATimeline] = useState([]);
   const [loadingSLA, setLoadingSLA] = useState(false);
+  const [holding, setHolding] = useState(false);
 
   const statusMeta = WORK_ORDER_STATUS[status];
   const canAssignByStatus = ["APPROVED", "ASSIGNED"].includes(status);
@@ -120,12 +121,21 @@ export default function WorkOrderDetail() {
     if (!wo) return;
 
     getAssets().then((r) => {
+      const isFinal = ["CLOSED", "CANCELLED"].includes(wo.status);
+
+      if (isFinal) {
+        // ✅ SAU KHI ĐÓNG → chỉ tin Asset API
+        setAssets(r.data);
+        return;
+      }
+
+      // ⬇️ CHỈ merge khi WO CHƯA KẾT THÚC
       const available = r.data.filter((a) => a.status === "AVAILABLE");
       const assigned = wo.assignedAssets || [];
 
       const merged = [
         ...available,
-        ...assigned.filter((a) => !available.find((x) => x._id === a._id)),
+        ...assigned.filter((a) => !available.some((x) => x._id === a._id)),
       ];
 
       setAssets(merged);
@@ -249,9 +259,16 @@ export default function WorkOrderDetail() {
     ),
   ];
 
-  const hasChecklist = wo.checklist && wo.checklist.length > 0;
+  const hasChecklist = wo.checklist?.length > 0;
+  const hasAsset = wo.assignedAssets?.length > 0;
+  const hasTechnician = wo.assignedTechnicians?.length > 0;
   const slaBlocked = wo.sla?.breached;
-  const canStartWork = can("start", status, role) && hasChecklist;
+  const canStartWork =
+    status === "ASSIGNED" &&
+    role === ROLES.TECHNICIAN &&
+    hasChecklist &&
+    hasAsset &&
+    hasTechnician;
   const isBlocked = [
     "ON_HOLD",
     "CANCELLED",
@@ -304,10 +321,20 @@ export default function WorkOrderDetail() {
   };
 
   const handleHoldConfirm = async (reason) => {
-    await holdWorkOrder(id, { reason });
-    setOpenHold(false);
-    setHoldReason("");
-    loadWO();
+    if (holding) return;
+
+    try {
+      setHolding(true);
+      await holdWorkOrder(id, { reason });
+      message.success("Work order is on hold");
+      setOpenHold(false);
+      setHoldReason("");
+      loadWO();
+    } catch (e) {
+      message.error(e?.response?.data?.message || "Hold failed");
+    } finally {
+      setHolding(false);
+    }
   };
 
   const handleCancelConfirm = async (reason) => {
@@ -335,6 +362,15 @@ export default function WorkOrderDetail() {
               </div>
             </>
           }
+          style={{ marginBottom: 12 }}
+        />
+      )}
+
+      {status !== "ASSIGNED" && can("start", status, role) && (
+        <Alert
+          type="warning"
+          showIcon
+          message="Work order must be ASSIGNED (technician + asset) before starting"
           style={{ marginBottom: 12 }}
         />
       )}
@@ -890,6 +926,12 @@ export default function WorkOrderDetail() {
                       </Select.Option>
                     ))}
                   </Select>
+
+                  {wo.status === "ON_HOLD" && (
+                    <Tag color="orange" style={{ marginBottom: 8 }}>
+                      Maintenance Paused
+                    </Tag>
+                  )}
 
                   <Button
                     type="primary"

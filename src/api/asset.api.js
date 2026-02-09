@@ -11,3 +11,6 @@ export const getAssetHistory = (id) => api.get(`/assets/${id}/history`);
 export const maintainAsset = (id, note) =>
   api.patch(`/assets/${id}/maintain`, { note });
 export const getAssetPMHistory = (id) => api.get(`/assets/${id}/pm-history`);
+
+export const getAssetDowntimeDetail = (assetId) =>
+  api.get(`/assets/${assetId}/downtime`);

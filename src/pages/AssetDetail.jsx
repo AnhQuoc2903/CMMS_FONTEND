@@ -1,10 +1,11 @@
-import { Card, Table, Tag, Button } from "antd";
+import { Card, Table, Tag, Button, Statistic } from "antd";
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   getAssetDetail,
   getAssetHistory,
   getAssetPMHistory,
+  getAssetDowntimeDetail,
 } from "../api/asset.api";
 
 export default function AssetDetail() {
@@ -13,6 +14,7 @@ export default function AssetDetail() {
   const [asset, setAsset] = useState(null);
   const [logs, setLogs] = useState([]);
   const [pmHistory, setPmHistory] = useState([]);
+  const [downtime, setDowntime] = useState(null);
 
   useEffect(() => {
     getAssetDetail(id).then((r) => setAsset(r.data));
@@ -22,7 +24,32 @@ export default function AssetDetail() {
     getAssetPMHistory(id).then((r) => setPmHistory(r.data));
   }, [id]);
 
+  useEffect(() => {
+    const fetchDowntime = () => {
+      getAssetDowntimeDetail(id).then((r) => setDowntime(r.data));
+    };
+
+    fetchDowntime(); // gọi ngay khi load
+
+    const timer = setInterval(fetchDowntime, 30000); // 30s
+
+    return () => clearInterval(timer);
+  }, [id]);
+
   if (!asset) return null;
+
+  const renderDowntime = (ms) => {
+    if (!ms || ms <= 0) return "0 min";
+
+    const totalMinutes = Math.floor(ms / 1000 / 60);
+
+    if (totalMinutes < 60) {
+      return `${totalMinutes} min`;
+    }
+
+    const hours = Math.floor((totalMinutes / 60) * 10) / 10;
+    return `${hours} h`;
+  };
 
   return (
     <>
@@ -52,12 +79,39 @@ export default function AssetDetail() {
               dataIndex: "action",
               render: (v) => {
                 const map = {
-                  ASSIGNED: { text: "Gán vào WO", color: "blue" },
-                  UNASSIGNED: { text: "Gỡ khỏi WO", color: "orange" },
-                  MAINTAINED: { text: "Đã bảo trì", color: "green" },
-                  AVAILABLE: { text: "Sẵn sàng sử dụng", color: "green" },
+                  ASSIGNED: { text: "Assigned to Work Order", color: "blue" },
+
+                  START_MAINTENANCE: {
+                    text: "Maintenance Started",
+                    color: "orange",
+                  },
+
+                  PAUSE_MAINTENANCE: {
+                    text: "Maintenance Paused",
+                    color: "gold",
+                  },
+
+                  RESUME_MAINTENANCE: {
+                    text: "Maintenance Resumed",
+                    color: "orange",
+                  },
+
+                  END_MAINTENANCE: {
+                    text: "Maintenance Completed",
+                    color: "green",
+                  },
+
+                  CANCEL_MAINTENANCE: {
+                    text: "Maintenance Cancelled",
+                    color: "red",
+                  },
                 };
-                return <Tag color={map[v]?.color}>{map[v]?.text}</Tag>;
+
+                return (
+                  <Tag color={map[v]?.color || "default"}>
+                    {map[v]?.text || v}
+                  </Tag>
+                );
               },
             },
 
@@ -107,6 +161,64 @@ export default function AssetDetail() {
           ]}
         />
       </Card>
+      <Card title="Asset Downtime">
+        <Statistic
+          title="Total Downtime"
+          value={renderDowntime(downtime?.totalDowntimeMs)}
+        />
+
+        <Table
+          rowKey="_id"
+          dataSource={downtime?.workOrders || []}
+          columns={[
+            { title: "Work Order", dataIndex: "title" },
+            { title: "Status", dataIndex: "status" },
+            {
+              title: "Start",
+              render: (_, w) =>
+                w.startedAt ? new Date(w.startedAt).toLocaleString() : "-",
+            },
+          ]}
+        />
+      </Card>
+
+      <h3>Downtime History</h3>
+
+      <Table
+        rowKey="_id"
+        dataSource={downtime?.history || []}
+        columns={[
+          {
+            title: "Work Order",
+            render: (_, r) => r.workOrder?.title || "-",
+          },
+          {
+            title: "Start",
+            render: (_, r) =>
+              r.startedAt ? new Date(r.startedAt).toLocaleString() : "-",
+          },
+          {
+            title: "End",
+            render: (_, r) =>
+              r.endedAt ? new Date(r.endedAt).toLocaleString() : "-",
+          },
+          {
+            title: "Hours",
+            render: (_, r) => {
+              if (!r.downtimeMs) return "0";
+
+              const hours = r.downtimeMs / 1000 / 60 / 60;
+
+              if (hours < 1) {
+                const mins = Math.round(r.downtimeMs / 1000 / 60);
+                return `${mins} min`;
+              }
+
+              return hours.toFixed(2);
+            },
+          },
+        ]}
+      />
     </>
   );
 }

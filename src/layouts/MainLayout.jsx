@@ -12,13 +12,22 @@ export default function MainLayout() {
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const items = [
-    { key: "/", label: "Dashboard" },
+  const items = [];
+
+  // ✅ DASHBOARD – LUÔN ĐỨNG ĐẦU
+  if (
+    user?.role === ROLES.SUPER_ADMIN ||
+    user?.role === ROLES.BUILDING_MANAGER
+  ) {
+    items.push({ key: "/dashboard", label: "Dashboard" });
+  }
+
+  // ✅ COMMON MODULES
+  items.push(
     { key: "/work-orders", label: "Work Orders" },
     { key: "/assets", label: "Assets" },
     { key: "/inventory", label: "Inventory" },
-  ];
-
+  );
   // ✅ SUPER_ADMIN / BUILDING_MANAGER
   if (
     user?.role === ROLES.SUPER_ADMIN ||
@@ -32,7 +41,6 @@ export default function MainLayout() {
       { key: "/maintenance-plans", label: "Maintenance Plans" },
       { key: "/reports/sla", label: "SLA Dashboard" },
       { key: "/sla/technicians", label: "SLA Technician Ranking" },
-      { key: "/notifications", label: "Notifications" },
     );
   }
 
@@ -40,6 +48,8 @@ export default function MainLayout() {
   if (user?.role === ROLES.MSP_SUPERVISOR) {
     items.push({ key: "/tenant-requests", label: "Tenant Requests" });
   }
+
+  items.push({ key: "/notifications", label: "Notifications" });
 
   const handleLogout = () => {
     Modal.confirm({

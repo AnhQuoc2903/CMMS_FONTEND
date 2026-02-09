@@ -19,6 +19,7 @@ import { ROLES } from "./constants/roles";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import NotificationsPage from "./pages/Notifications";
+import Dashboard from "./pages/Dashboard";
 
 export default function Router() {
   return (
@@ -30,6 +31,14 @@ export default function Router() {
         <Route path="/request" element={<TenantRequestForm />} />
 
         <Route element={<MainLayout />}>
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/"
             element={

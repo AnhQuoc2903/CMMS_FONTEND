@@ -81,9 +81,9 @@ export default function Assets() {
               const color =
                 v === "AVAILABLE"
                   ? "green"
-                  : v === "IN_USE"
-                  ? "blue"
-                  : "orange";
+                  : v === "MAINTENANCE"
+                    ? "orange"
+                    : "default";
 
               return <Tag color={color}>{v}</Tag>;
             },

@@ -20,7 +20,8 @@ export const can = (action, status, role) => {
     /* ================= ASSIGN ================= */
     case "assign":
       return (
-        role === ROLES.SUPER_ADMIN && ["APPROVED", "ASSIGNED"].includes(status)
+        [ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER].includes(role) &&
+        ["APPROVED", "ASSIGNED"].includes(status)
       );
 
     /* ================= TECHNICIAN FLOW ================= */
@@ -31,7 +32,10 @@ export const can = (action, status, role) => {
       return role === ROLES.TECHNICIAN && status === "IN_PROGRESS";
 
     case "hold":
-      return role === ROLES.TECHNICIAN && status === "IN_PROGRESS";
+      return (
+        role === ROLES.TECHNICIAN &&
+        ["ASSIGNED", "IN_PROGRESS"].includes(status)
+      );
 
     case "resume":
       return role === ROLES.TECHNICIAN && status === "ON_HOLD";
