@@ -7,7 +7,7 @@ export default function LowStockAlert({ reload }) {
 
   useEffect(() => {
     getLowStock().then((res) => setData(res.data));
-  }, [reload]); // 👈 QUAN TRỌNG
+  }, [reload]);
 
   if (!data.length) return null;
 
@@ -15,7 +15,7 @@ export default function LowStockAlert({ reload }) {
     <Alert
       type="warning"
       showIcon
-      message="⚠️ Low Stock Warning"
+      message="Low Stock Warning"
       description={
         <List
           size="small"

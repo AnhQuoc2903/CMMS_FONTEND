@@ -1,33 +1,36 @@
-import { Modal, Form, Input, message } from "antd";
-import { useEffect } from "react";
+import { Modal, Form, Input, message, Select } from "antd";
+import { useEffect, useState } from "react";
 import { updateAsset } from "../api/asset.api";
+import { getAssetGroups } from "../api/assetGroup.api";
 
 export default function EditAssetModal({ open, asset, onClose, onUpdated }) {
   const [form] = Form.useForm();
+  const [groups, setGroups] = useState([]);
 
-  // ===== ĐỔ DATA VÀO FORM KHI CHỌN ASSET =====
+  useEffect(() => {
+    getAssetGroups().then((r) => setGroups(r.data));
+  }, []);
+
   useEffect(() => {
     if (asset) {
       form.setFieldsValue({
         name: asset.name,
         code: asset.code,
-        category: asset.category,
+        group: asset.group?._id || asset.group || undefined,
         location: asset.location,
       });
     }
   }, [asset, form]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (values) => {
     try {
-      const values = await form.validateFields();
-
       await updateAsset(asset._id, values);
 
       message.success("Asset updated");
-      onUpdated();
-      onClose();
+      onUpdated?.();
+      onClose?.();
     } catch (err) {
-      console.error(err);
+      message.error(err?.response?.data?.message || "Update failed");
     }
   };
 
@@ -35,11 +38,11 @@ export default function EditAssetModal({ open, asset, onClose, onUpdated }) {
     <Modal
       title="Edit Asset"
       open={open}
-      onOk={handleSubmit}
+      onOk={() => form.submit()}
       onCancel={onClose}
       okText="Save"
     >
-      <Form form={form} layout="vertical">
+      <Form form={form} layout="vertical" onFinish={handleSubmit}>
         <Form.Item
           name="name"
           label="Name"
@@ -56,8 +59,15 @@ export default function EditAssetModal({ open, asset, onClose, onUpdated }) {
           <Input />
         </Form.Item>
 
-        <Form.Item name="category" label="Category">
-          <Input />
+        <Form.Item name="group" label="Asset Group">
+          <Select
+            allowClear
+            placeholder="Select asset group"
+            options={groups.map((g) => ({
+              label: g.name,
+              value: g._id,
+            }))}
+          />
         </Form.Item>
 
         <Form.Item name="location" label="Location">

@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { Table, Button, Tag, Modal, Input, Space, message } from "antd";
+import { Table, Button, Tag, Modal, Input, Space, message, Image } from "antd";
 import { useEffect, useState } from "react";
 import {
   getTenantRequests,
@@ -9,6 +9,8 @@ import {
   rejectTenantRequest,
 } from "../api/tenant.api";
 
+import { useAuth } from "../auth/AuthContext";
+
 const STATUS_COLOR = {
   BUILDING_APPROVED: "cyan",
   MSP_REVIEWED: "purple",
@@ -17,6 +19,7 @@ const STATUS_COLOR = {
 };
 
 export default function TenantRequests() {
+  const { user } = useAuth();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -74,12 +77,35 @@ export default function TenantRequests() {
           },
 
           {
+            title: "Images",
+            render: (_, r) =>
+              r.imageUrl?.length ? (
+                <Space>
+                  {r.imageUrl.map((img, i) => (
+                    <Image
+                      key={i}
+                      src={img.url}
+                      width={50}
+                      height={50}
+                      style={{ objectFit: "cover", borderRadius: 6 }}
+                    />
+                  ))}
+                </Space>
+              ) : (
+                "-"
+              ),
+          },
+
+          {
             title: "Status",
             render: (_, r) =>
               r.status === "REJECTED" ? (
-                <Tag color="red" title={r.rejectReason}>
-                  REJECTED
-                </Tag>
+                <>
+                  <Tag color="red">REJECTED</Tag>
+                  <div style={{ color: "#ff4d4f", fontSize: 12 }}>
+                    {r.rejectReason}
+                  </div>
+                </>
               ) : (
                 <Tag color={STATUS_COLOR[r.status]}>{r.status}</Tag>
               ),
@@ -88,55 +114,86 @@ export default function TenantRequests() {
             title: "Action",
             render: (_, r) => (
               <Space>
-                {/* BUILDING APPROVE */}
-                {r.status === "SUBMITTED" && (
-                  <Button
-                    type="primary"
-                    size="small"
-                    onClick={async () => {
-                      await buildingApprove(r._id);
-                      message.success("Building approved");
-                      loadData();
-                    }}
-                  >
-                    Building Approve
-                  </Button>
-                )}
+                {r.status === "SUBMITTED" &&
+                  user.role === "BUILDING_MANAGER" && (
+                    <Button
+                      type="primary"
+                      size="small"
+                      onClick={async () => {
+                        await buildingApprove(r._id);
+                        message.success("Building approved");
+                        loadData();
+                      }}
+                    >
+                      Building Approve
+                    </Button>
+                  )}
 
                 {/* MSP REVIEW */}
-                {r.status === "BUILDING_APPROVED" && (
-                  <Button
-                    type="primary"
-                    size="small"
-                    onClick={async () => {
-                      await mspReview(r._id);
-                      message.success("MSP reviewed");
-                      loadData(); // ✅ BẮT BUỘC
-                    }}
-                  >
-                    MSP Review
-                  </Button>
-                )}
+                {r.status === "BUILDING_APPROVED" &&
+                  user.role === "MSP_SUPERVISOR" && (
+                    <Button
+                      type="primary"
+                      size="small"
+                      onClick={async () => {
+                        await mspReview(r._id);
+                        message.success("MSP reviewed");
+                        loadData(); // ✅ BẮT BUỘC
+                      }}
+                    >
+                      MSP Review
+                    </Button>
+                  )}
 
                 {/* FINAL APPROVE */}
-                {r.status === "MSP_REVIEWED" && (
-                  <Button
-                    type="primary"
-                    size="small"
-                    onClick={async () => {
-                      await finalApprove(r._id);
-                      message.success("Work Order created");
-                      loadData();
-                    }}
-                  >
-                    Final Approve
-                  </Button>
-                )}
+                {r.status === "MSP_REVIEWED" &&
+                  ["SUPER_ADMIN"].includes(user.role) && (
+                    <Button
+                      type="primary"
+                      size="small"
+                      onClick={async () => {
+                        await finalApprove(r._id);
+                        message.success("Work Order created");
+                        loadData();
+                      }}
+                    >
+                      Final Approve
+                    </Button>
+                  )}
 
                 {/* REJECT (chung) */}
-                {["SUBMITTED", "BUILDING_APPROVED", "MSP_REVIEWED"].includes(
-                  r.status
-                ) && (
+                {/* REJECT - BUILDING MANAGER */}
+                {r.status === "SUBMITTED" &&
+                  user.role === "BUILDING_MANAGER" && (
+                    <Button
+                      danger
+                      size="small"
+                      onClick={() => {
+                        setSelected(r);
+                        setOpenReject(true);
+                      }}
+                    >
+                      Reject
+                    </Button>
+                  )}
+
+                {/* REJECT - MSP SUPERVISOR */}
+                {r.status === "BUILDING_APPROVED" &&
+                  user.role === "MSP_SUPERVISOR" && (
+                    <Button
+                      danger
+                      size="small"
+                      onClick={() => {
+                        setSelected(r);
+                        setOpenReject(true);
+                      }}
+                    >
+                      Reject
+                    </Button>
+                  )}
+
+                {/* REJECT - SUPER ADMIN */}
+                {r.status === "MSP_REVIEWED" && user.role === "SUPER_ADMIN" && (
                   <Button
                     danger
                     size="small"

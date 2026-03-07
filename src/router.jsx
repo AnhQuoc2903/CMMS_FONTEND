@@ -20,6 +20,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import NotificationsPage from "./pages/Notifications";
 import Dashboard from "./pages/Dashboard";
+import InventoryDetail from "./pages/InventoryDetail";
+import AssetGroups from "./pages/AssetGroups";
 
 export default function Router() {
   return (
@@ -85,6 +87,17 @@ export default function Router() {
           />
 
           <Route
+            path="/asset-groups"
+            element={
+              <ProtectedRoute
+                roles={[ROLES.SUPER_ADMIN, ROLES.BUILDING_MANAGER]}
+              >
+                <AssetGroups />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/assets/:id"
             element={
               <ProtectedRoute>
@@ -98,6 +111,14 @@ export default function Router() {
             element={
               <ProtectedRoute>
                 <Inventory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory/:id"
+            element={
+              <ProtectedRoute>
+                <InventoryDetail />
               </ProtectedRoute>
             }
           />

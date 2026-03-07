@@ -102,7 +102,16 @@ export default function MaintenancePlans() {
         }}
         columns={[
           { title: "Name", dataIndex: "name" },
-          { title: "Frequency", dataIndex: "frequency" },
+          {
+            title: "Frequency",
+            render: (_, r) => {
+              if (r.frequencyType === "INTERVAL") {
+                return `Every ${r.intervalValue} ${r.intervalUnit}`;
+              }
+
+              return r.frequency;
+            },
+          },
           {
             title: "Next Run",
             dataIndex: "nextRunAt",

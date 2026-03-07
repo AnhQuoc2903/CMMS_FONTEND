@@ -14,3 +14,5 @@ export const getAssetPMHistory = (id) => api.get(`/assets/${id}/pm-history`);
 
 export const getAssetDowntimeDetail = (assetId) =>
   api.get(`/assets/${assetId}/downtime`);
+
+export const getAssetGroups = () => api.get("/asset-groups");

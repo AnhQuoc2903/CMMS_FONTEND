@@ -94,7 +94,10 @@ export default function Assets() {
             render: (v, r) => <Link to={`/assets/${r._id}`}>{v}</Link>,
           },
           { title: "Code", dataIndex: "code" },
-          { title: "Category", dataIndex: "category" },
+          {
+            title: "Group",
+            render: (_, r) => r.group?.name || "-",
+          },
           { title: "Location", dataIndex: "location" },
           {
             title: "Actions",

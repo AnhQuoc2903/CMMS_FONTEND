@@ -7,6 +7,7 @@ import {
   getAssetPMHistory,
   getAssetDowntimeDetail,
 } from "../api/asset.api";
+import AssetCompatibleParts from "../components/AssetCompatibleParts";
 
 export default function AssetDetail() {
   const { id } = useParams();
@@ -219,6 +220,7 @@ export default function AssetDetail() {
           },
         ]}
       />
+      <AssetCompatibleParts assetId={id} />
     </>
   );
 }

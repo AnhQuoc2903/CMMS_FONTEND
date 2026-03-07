@@ -1,20 +1,29 @@
-import { Modal, Form, Input, message } from "antd";
+import { Modal, Form, Input, Select, message } from "antd";
+import { useEffect, useState } from "react";
 import { createAsset } from "../api/asset.api";
+import { getAssetGroups } from "../api/assetGroup.api";
 
 export default function CreateAssetModal({ open, onClose, onCreated }) {
   const [form] = Form.useForm();
+  const [groups, setGroups] = useState([]);
+
+  useEffect(() => {
+    getAssetGroups().then((r) => setGroups(r.data));
+  }, []);
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+
       await createAsset(values);
 
       message.success("Asset created");
+
       form.resetFields();
-      onCreated(); // reload table
-      onClose(); // close modal
-    } catch (e) {
-      console.error(e);
+      onCreated?.();
+      onClose?.();
+    } catch (err) {
+      message.error(err?.response?.data?.message || "Create asset failed");
     }
   };
 
@@ -24,30 +33,35 @@ export default function CreateAssetModal({ open, onClose, onCreated }) {
       open={open}
       onOk={handleSubmit}
       onCancel={onClose}
-      okText="Create"
+      destroyOnClose
     >
-      <Form form={form} layout="vertical">
+      <Form form={form} layout="vertical" onFinish={handleSubmit}>
         <Form.Item
-          label="Name"
           name="name"
-          rules={[{ required: true, message: "Name is required" }]}
+          label="Name"
+          rules={[{ required: true, message: "Please enter name" }]}
         >
           <Input />
         </Form.Item>
 
         <Form.Item
-          label="Code"
           name="code"
-          rules={[{ required: true, message: "Code is required" }]}
+          label="Code"
+          rules={[{ required: true, message: "Please enter code" }]}
         >
           <Input />
         </Form.Item>
 
-        <Form.Item label="Category" name="category">
-          <Input />
+        <Form.Item name="group" label="Asset Group">
+          <Select
+            options={groups.map((g) => ({
+              label: g.name,
+              value: g._id,
+            }))}
+          />
         </Form.Item>
 
-        <Form.Item label="Location" name="location">
+        <Form.Item name="location" label="Location">
           <Input />
         </Form.Item>
       </Form>

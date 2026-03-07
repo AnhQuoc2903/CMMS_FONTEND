@@ -1,4 +1,12 @@
-import { Modal, Form, Input, Select, DatePicker, message } from "antd";
+import {
+  Modal,
+  Form,
+  Input,
+  Select,
+  DatePicker,
+  message,
+  InputNumber,
+} from "antd";
 import dayjs from "dayjs";
 import { useEffect } from "react";
 import {
@@ -23,6 +31,9 @@ export default function MaintenancePlanModal({
       form.setFieldsValue({
         name: editing.name,
         frequency: editing.frequency,
+        frequencyType: editing.frequencyType || "STANDARD",
+        intervalValue: editing.intervalValue,
+        intervalUnit: editing.intervalUnit,
         assets: editing.assets?.map((a) => (typeof a === "string" ? a : a._id)),
         checklistTemplate:
           typeof editing.checklistTemplate === "string"
@@ -35,7 +46,7 @@ export default function MaintenancePlanModal({
     if (!editing && open) {
       form.resetFields();
     }
-  }, [editing, open]);
+  }, [editing, open, form]);
 
   /* ===== SUBMIT ===== */
   const submit = async () => {
@@ -91,18 +102,66 @@ export default function MaintenancePlanModal({
         <Form.Item name="name" label="Plan Name" rules={[{ required: true }]}>
           <Input />
         </Form.Item>
-
         <Form.Item
-          name="frequency"
-          label="Frequency"
+          name="frequencyType"
+          label="Schedule Type"
+          initialValue="STANDARD"
           rules={[{ required: true }]}
         >
           <Select>
-            <Select.Option value="DAILY">Daily</Select.Option>
-            <Select.Option value="WEEKLY">Weekly</Select.Option>
-            <Select.Option value="MONTHLY">Monthly</Select.Option>
-            <Select.Option value="YEARLY">Yearly</Select.Option>
+            <Select.Option value="STANDARD">Standard</Select.Option>
+            <Select.Option value="INTERVAL">Custom Interval</Select.Option>
           </Select>
+        </Form.Item>
+
+        {/* STANDARD */}
+        <Form.Item noStyle shouldUpdate dependencies={["frequencyType"]}>
+          {({ getFieldValue }) =>
+            getFieldValue("frequencyType") === "STANDARD" && (
+              <Form.Item
+                name="frequency"
+                label="Frequency"
+                rules={[{ required: true }]}
+              >
+                <Select>
+                  <Select.Option value="DAILY">Daily</Select.Option>
+                  <Select.Option value="WEEKLY">Weekly</Select.Option>
+                  <Select.Option value="MONTHLY">Monthly</Select.Option>
+                  <Select.Option value="YEARLY">Yearly</Select.Option>
+                </Select>
+              </Form.Item>
+            )
+          }
+        </Form.Item>
+
+        {/* INTERVAL */}
+        <Form.Item noStyle shouldUpdate dependencies={["frequencyType"]}>
+          {({ getFieldValue }) =>
+            getFieldValue("frequencyType") === "INTERVAL" && (
+              <>
+                <Form.Item
+                  name="intervalValue"
+                  label="Every"
+                  rules={[{ required: true }]}
+                >
+                  <InputNumber min={1} style={{ width: "100%" }} />
+                </Form.Item>
+
+                <Form.Item
+                  name="intervalUnit"
+                  label="Unit"
+                  rules={[{ required: true }]}
+                >
+                  <Select>
+                    <Select.Option value="DAY">Days</Select.Option>
+                    <Select.Option value="WEEK">Weeks</Select.Option>
+                    <Select.Option value="MONTH">Months</Select.Option>
+                    <Select.Option value="YEAR">Years</Select.Option>
+                  </Select>
+                </Form.Item>
+              </>
+            )
+          }
         </Form.Item>
 
         {/* ✅ ASSETS – AVAILABLE ONLY */}

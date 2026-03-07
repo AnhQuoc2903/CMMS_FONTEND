@@ -10,8 +10,12 @@ import {
   Tag,
   Popconfirm,
   message,
+  Select,
 } from "antd";
+
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
   getInventory,
   createSparePart,
@@ -20,17 +24,24 @@ import {
   enableSparePart,
   stockInSparePart,
 } from "../api/inventory.api";
+import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
+
 import LowStockAlert from "../components/LowStockAlert";
+import SparePartTree from "../components/SparePartTree";
+import { getAssets } from "../api/asset.api";
 
 export default function Inventory() {
+  const navigate = useNavigate();
+
   const [data, setData] = useState([]);
+  const [assets, setAssets] = useState([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form] = Form.useForm();
 
   const [openStockIn, setOpenStockIn] = useState(false);
   const [stockInPart, setStockInPart] = useState(null);
-  const [stockInQty, setStockInQty] = useState(null);
+  const [stockInQty, setStockInQty] = useState(1);
 
   const [reloadLowStock, setReloadLowStock] = useState(0);
 
@@ -42,28 +53,24 @@ export default function Inventory() {
 
   useEffect(() => {
     load();
+    getAssets().then((r) => setAssets(r.data));
   }, []);
 
-  /* ===== CREATE / UPDATE ===== */
   const submit = async () => {
-    try {
-      const values = await form.validateFields();
+    const values = await form.validateFields();
 
-      if (editing) {
-        await updateSparePart(editing._id, values);
-        message.success("Spare part updated");
-      } else {
-        await createSparePart(values);
-        message.success("Spare part created");
-      }
-
-      setOpen(false);
-      setEditing(null);
-      form.resetFields();
-      load();
-    } catch (e) {
-      message.error(e?.response?.data?.message || "Save failed");
+    if (editing) {
+      await updateSparePart(editing._id, values);
+      message.success("Updated");
+    } else {
+      await createSparePart(values);
+      message.success("Created");
     }
+
+    setOpen(false);
+    setEditing(null);
+    form.resetFields();
+    load();
   };
 
   const openCreate = () => {
@@ -74,12 +81,17 @@ export default function Inventory() {
 
   const openEdit = (record) => {
     setEditing(record);
+
     form.setFieldsValue({
       name: record.name,
       sku: record.sku,
-      quantity: record.quantity,
-      status: record.status,
+      minStock: record.minStock,
+      inventoryMethod: record.inventoryMethod,
+      specs: record.specs?.length ? record.specs : [],
+      parentPart: record.parentPart?._id || record.parentPart || null,
+      compatibleAssets: record.compatibleAssets || [],
     });
+
     setOpen(true);
   };
 
@@ -89,7 +101,7 @@ export default function Inventory() {
 
       <Space style={{ marginBottom: 16 }}>
         <Button type="primary" onClick={openCreate}>
-          ➕ Add Spare Part
+          Add Spare Part
         </Button>
       </Space>
 
@@ -99,10 +111,9 @@ export default function Inventory() {
         columns={[
           { title: "Name", dataIndex: "name" },
           { title: "SKU", dataIndex: "sku" },
-          {
-            title: "Total",
-            dataIndex: "quantity",
-          },
+          { title: "Total", dataIndex: "quantity" },
+          { title: "Min Stock", dataIndex: "minStock" },
+
           {
             title: "Reserved",
             dataIndex: "reservedQuantity",
@@ -112,16 +123,14 @@ export default function Inventory() {
             title: "Available",
             render: (_, r) => {
               const available = r.quantity - (r.reservedQuantity || 0);
+
               return available <= r.minStock ? (
-                <span style={{ color: "red", fontWeight: 600 }}>
-                  {available} ⚠ Low
-                </span>
+                <span style={{ color: "red" }}>{available} Low</span>
               ) : (
                 <b>{available}</b>
               );
             },
           },
-
           {
             title: "Status",
             dataIndex: "status",
@@ -133,6 +142,13 @@ export default function Inventory() {
             title: "Action",
             render: (_, r) => (
               <Space>
+                <Button
+                  size="small"
+                  onClick={() => navigate(`/inventory/${r._id}`)}
+                >
+                  Detail
+                </Button>
+
                 <Button size="small" onClick={() => openEdit(r)}>
                   Edit
                 </Button>
@@ -143,7 +159,6 @@ export default function Inventory() {
                   disabled={r.status !== "ACTIVE"}
                   onClick={() => {
                     setStockInPart(r);
-                    setStockInQty(1);
                     setOpenStockIn(true);
                   }}
                 >
@@ -152,10 +167,9 @@ export default function Inventory() {
 
                 {r.status === "ACTIVE" ? (
                   <Popconfirm
-                    title="Disable this spare part?"
+                    title="Disable?"
                     onConfirm={async () => {
                       await disableSparePart(r._id);
-                      message.success("Spare part disabled");
                       load();
                     }}
                   >
@@ -169,7 +183,6 @@ export default function Inventory() {
                     size="small"
                     onClick={async () => {
                       await enableSparePart(r._id);
-                      message.success("Spare part enabled");
                       load();
                     }}
                   >
@@ -182,23 +195,16 @@ export default function Inventory() {
         ]}
       />
 
-      {/* ===== MODAL ===== */}
+      <SparePartTree />
+
       <Modal
         title={editing ? "Edit Spare Part" : "Create Spare Part"}
         open={open}
-        onCancel={() => {
-          setOpen(false);
-          setEditing(null);
-        }}
+        onCancel={() => setOpen(false)}
         onOk={submit}
-        okText={editing ? "Save" : "Create"}
       >
         <Form form={form} layout="vertical">
-          <Form.Item
-            name="name"
-            label="Name"
-            rules={[{ required: true, message: "Name is required" }]}
-          >
+          <Form.Item name="name" label="Name" required>
             <Input />
           </Form.Item>
 
@@ -206,57 +212,101 @@ export default function Inventory() {
             <Input />
           </Form.Item>
 
-          {/* CHỈ HIỆN QUANTITY KHI CREATE */}
+          <Form.Item name="minStock" label="Min Stock">
+            <InputNumber style={{ width: "100%" }} />
+          </Form.Item>
+
+          <Form.Item
+            name="inventoryMethod"
+            label="Inventory Method"
+            initialValue="FIFO"
+          >
+            <Select>
+              <Select.Option value="FIFO">FIFO</Select.Option>
+              <Select.Option value="LIFO">LIFO</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.List name="specs">
+            {(fields, { add, remove }) => (
+              <>
+                <label>Technical Specs</label>
+
+                {fields.map(({ key, name }) => (
+                  <Space key={key} style={{ display: "flex", marginBottom: 8 }}>
+                    <Form.Item name={[name, "key"]}>
+                      <Input placeholder="Key (ex: Length)" />
+                    </Form.Item>
+
+                    <Form.Item name={[name, "value"]}>
+                      <Input placeholder="Value (ex: 50)" />
+                    </Form.Item>
+
+                    <Form.Item name={[name, "unit"]}>
+                      <Input placeholder="Unit (ex: m)" />
+                    </Form.Item>
+
+                    <MinusCircleOutlined onClick={() => remove(name)} />
+                  </Space>
+                ))}
+
+                <Button
+                  type="dashed"
+                  onClick={() => add()}
+                  icon={<PlusOutlined />}
+                >
+                  Add Spec
+                </Button>
+              </>
+            )}
+          </Form.List>
+
           {!editing && (
-            <Form.Item
-              name="quantity"
-              label="Quantity"
-              rules={[{ required: true, message: "Quantity is required" }]}
-            >
-              <InputNumber min={0} style={{ width: "100%" }} />
+            <Form.Item name="quantity" label="Quantity">
+              <InputNumber style={{ width: "100%" }} />
             </Form.Item>
           )}
 
-          {editing && (
-            <Form.Item label="Status">
-              <Tag color={editing.status === "ACTIVE" ? "green" : "red"}>
-                {editing.status}
-              </Tag>
-            </Form.Item>
-          )}
+          <Form.Item name="parentPart" label="Parent Part">
+            <Select allowClear placeholder="Select parent part">
+              {data.map((p) => (
+                <Select.Option key={p._id} value={p._id}>
+                  {p.name}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="compatibleAssets" label="Compatible Assets">
+            <Select mode="multiple" placeholder="Select compatible assets">
+              {assets.map((a) => (
+                <Select.Option key={a._id} value={a._id}>
+                  {a.name}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
         </Form>
       </Modal>
 
-      {/* ===== STOCK IN MODAL ===== */}
       <Modal
-        title={`Stock In - ${stockInPart?.name || ""}`}
+        title={`Stock In - ${stockInPart?.name}`}
         open={openStockIn}
         onCancel={() => setOpenStockIn(false)}
         onOk={async () => {
-          try {
-            await stockInSparePart(stockInPart._id, {
-              quantity: stockInQty,
-              note: "Manual stock in",
-            });
+          await stockInSparePart(stockInPart._id, {
+            quantity: stockInQty,
+          });
 
-            message.success("Stock added");
-            setOpenStockIn(false);
-            load();
-          } catch (e) {
-            message.error(e?.response?.data?.message || "Stock in failed");
-          }
+          setOpenStockIn(false);
+          load();
         }}
       >
-        <Form layout="vertical">
-          <Form.Item label="Quantity">
-            <InputNumber
-              min={1}
-              value={stockInQty}
-              onChange={setStockInQty}
-              style={{ width: "100%" }}
-            />
-          </Form.Item>
-        </Form>
+        <InputNumber
+          min={1}
+          value={stockInQty}
+          onChange={setStockInQty}
+          style={{ width: "100%" }}
+        />
       </Modal>
     </>
   );
