@@ -13,6 +13,7 @@ import {
 } from "antd";
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { DownloadOutlined, FileTextOutlined } from "@ant-design/icons";
 
 import {
   getWorkOrderDetail,
@@ -412,10 +413,21 @@ export default function WorkOrderDetail() {
       )}
 
       <Card
-        title={wo.title}
+        title={
+          <div className="flex items-center gap-2">
+            <FileTextOutlined className="text-blue-500 text-lg " />
+            <span className="text-lg font-semibold text-gray-800 tracking-tight">
+              {wo.title}
+            </span>
+          </div>
+        }
         extra={
           ["COMPLETED", "REVIEWED", "VERIFIED", "CLOSED"].includes(status) && (
-            <Button type="primary" onClick={downloadPDF}>
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              onClick={downloadPDF}
+            >
               Export PDF
             </Button>
           )
@@ -488,7 +500,14 @@ export default function WorkOrderDetail() {
                       />
                     )}
 
-                  <p>{wo.description}</p>
+                  <p>
+                    <b>Description:</b>
+                    {wo.description || "-"}
+                  </p>
+
+                  <p>
+                    <b>Location:</b> {wo.location || "-"}
+                  </p>
 
                   <Tag color={statusMeta?.color}>{statusMeta?.label}</Tag>
                   <Space style={{ marginTop: 8 }}>

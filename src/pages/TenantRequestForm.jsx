@@ -90,6 +90,14 @@ export default function TenantRequestForm() {
           </Form.Item>
 
           <Form.Item
+            label="Location"
+            name="location"
+            rules={[{ required: true, message: "Please enter issue location" }]}
+          >
+            <Input size="large" placeholder="Example: Room 502, Building A" />
+          </Form.Item>
+
+          <Form.Item
             label="Description"
             name="description"
             rules={[
@@ -124,21 +132,28 @@ export default function TenantRequestForm() {
 
           <Form.Item label="Upload Images (optional)">
             <Upload
+              listType="picture"
               multiple
+              fileList={files}
               beforeUpload={(file) => {
-                setFiles((prev) => [...prev, file]);
+                const reader = new FileReader();
+
+                reader.onload = () => {
+                  file.thumbUrl = reader.result;
+
+                  setFiles((prev) => [...prev, file]);
+                };
+
+                reader.readAsDataURL(file);
+
                 return false;
               }}
+              onRemove={(file) => {
+                setFiles((prev) => prev.filter((f) => f.uid !== file.uid));
+              }}
               maxCount={5}
-              style={{ width: "100%" }}
             >
-              <Button
-                icon={<FileImageOutlined />}
-                style={{
-                  width: "100%",
-                  borderRadius: 8,
-                }}
-              >
+              <Button icon={<FileImageOutlined />} style={{ width: "100%" }}>
                 Upload Photos
               </Button>
             </Upload>

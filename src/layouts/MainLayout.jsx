@@ -33,7 +33,6 @@ import {
   CrownOutlined,
   StarOutlined,
   GiftOutlined,
-  SettingOutlined,
   SafetyOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";

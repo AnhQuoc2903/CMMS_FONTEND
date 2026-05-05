@@ -1,5 +1,15 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { Table, Button, Tag, Modal, Input, Space, message, Image } from "antd";
+import {
+  Table,
+  Button,
+  Tag,
+  Modal,
+  Input,
+  Space,
+  message,
+  Image,
+  Tooltip,
+} from "antd";
 import { useEffect, useState } from "react";
 import {
   getTenantRequests,
@@ -61,11 +71,30 @@ export default function TenantRequests() {
           {
             title: "Title",
             dataIndex: "title",
+            render: (text) => (
+              <Tooltip title={text}>
+                <span>{text}</span>
+              </Tooltip>
+            ),
           },
           {
             title: "Description",
             dataIndex: "description",
             ellipsis: true,
+            render: (text) => (
+              <Tooltip title={text}>
+                <span>{text}</span>
+              </Tooltip>
+            ),
+          },
+          {
+            title: "Location",
+            dataIndex: "location",
+            render: (text) => (
+              <Tooltip title={text}>
+                <span>{text}</span>
+              </Tooltip>
+            ),
           },
           {
             title: "Tenant Name",
