@@ -40,7 +40,7 @@ import { useAuth } from "../auth/AuthContext";
 import { ROLES } from "../constants/roles";
 import { changePasswordApi } from "../api/auth.api";
 import NotificationBell from "../components/NotificationBell";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const { Header, Sider, Content } = Layout;
 
@@ -94,6 +94,15 @@ export default function MainLayout() {
 
   const items = [];
 
+  if (user?.role === ROLES.TENANT) {
+    items.push({
+      key: "/my-requests",
+      icon: <FileTextOutlined style={{ color: "#00C49F" }} />,
+      label: "My Requests",
+      style: { margin: "4px 0", borderRadius: 8 },
+    });
+  }
+
   // ✅ DASHBOARD – LUÔN ĐỨNG ĐẦU
   if (
     user?.role === ROLES.SUPER_ADMIN ||
@@ -107,33 +116,68 @@ export default function MainLayout() {
     });
   }
 
+  if (user?.role !== ROLES.TENANT) {
+    items.push(
+      {
+        key: "/work-orders",
+        icon: <ToolOutlined style={{ color: "#FF6B6B" }} />,
+        label: "Work Orders",
+        style: { margin: "4px 0", borderRadius: 8 },
+      },
+      {
+        key: "/assets",
+        icon: <DatabaseOutlined style={{ color: "#4ECDC4" }} />,
+        label: "Assets",
+        style: { margin: "4px 0", borderRadius: 8 },
+      },
+      {
+        key: "/asset-groups",
+        icon: <DatabaseOutlined style={{ color: "#4ECDC4" }} />,
+        label: "Asset Groups",
+        style: { margin: "4px 0", borderRadius: 8 },
+      },
+      {
+        key: "/inventory",
+        icon: <DatabaseOutlined style={{ color: "#45B7D1" }} />,
+        label: "Inventory",
+        style: { margin: "4px 0", borderRadius: 8 },
+      },
+    );
+  }
+
+  useEffect(() => {
+    if (user?.role === ROLES.TENANT && location.pathname === "/") {
+      nav("/my-requests");
+    }
+  }, [user, location.pathname, nav]);
+
   // ✅ COMMON MODULES
-  items.push(
-    {
-      key: "/work-orders",
-      icon: <ToolOutlined style={{ color: "#FF6B6B" }} />,
-      label: "Work Orders",
-      style: { margin: "4px 0", borderRadius: 8 },
-    },
-    {
-      key: "/assets",
-      icon: <DatabaseOutlined style={{ color: "#4ECDC4" }} />,
-      label: "Assets",
-      style: { margin: "4px 0", borderRadius: 8 },
-    },
-    {
-      key: "/asset-groups",
-      icon: <DatabaseOutlined style={{ color: "#4ECDC4" }} />,
-      label: "Asset Groups",
-      style: { margin: "4px 0", borderRadius: 8 },
-    },
-    {
-      key: "/inventory",
-      icon: <DatabaseOutlined style={{ color: "#45B7D1" }} />,
-      label: "Inventory",
-      style: { margin: "4px 0", borderRadius: 8 },
-    },
-  );
+  // items.push(
+  //   {
+  //     key: "/work-orders",
+  //     icon: <ToolOutlined style={{ color: "#FF6B6B" }} />,
+  //     label: "Work Orders",
+  //     style: { margin: "4px 0", borderRadius: 8 },
+  //   },
+  //   {
+  //     key: "/assets",
+  //     icon: <DatabaseOutlined style={{ color: "#4ECDC4" }} />,
+  //     label: "Assets",
+  //     style: { margin: "4px 0", borderRadius: 8 },
+  //   },
+  //   {
+  //     key: "/asset-groups",
+  //     icon: <DatabaseOutlined style={{ color: "#4ECDC4" }} />,
+  //     label: "Asset Groups",
+  //     style: { margin: "4px 0", borderRadius: 8 },
+  //   },
+  //   {
+  //     key: "/inventory",
+  //     icon: <DatabaseOutlined style={{ color: "#45B7D1" }} />,
+  //     label: "Inventory",
+  //     style: { margin: "4px 0", borderRadius: 8 },
+  //   },
+  // );
 
   // ✅ SUPER_ADMIN / BUILDING_MANAGER
   if (
@@ -203,24 +247,25 @@ export default function MainLayout() {
       style: { margin: "4px 0", borderRadius: 8 },
     });
   }
-
-  items.push(
-    {
-      type: "divider",
-      style: { margin: "12px 0", background: currentColor.light },
-    },
-    {
-      key: "/notifications",
-      icon: <BellOutlined style={{ color: "#FF69B4" }} />,
-      label: (
-        <Space>
-          Notifications
-          <Badge style={{ backgroundColor: currentColor.primary }} />
-        </Space>
-      ),
-      style: { margin: "4px 0", borderRadius: 8 },
-    },
-  );
+  if (user?.role !== ROLES.TENANT) {
+    items.push(
+      {
+        type: "divider",
+        style: { margin: "12px 0", background: currentColor.light },
+      },
+      {
+        key: "/notifications",
+        icon: <BellOutlined style={{ color: "#FF69B4" }} />,
+        label: (
+          <Space>
+            Notifications
+            <Badge style={{ backgroundColor: currentColor.primary }} />
+          </Space>
+        ),
+        style: { margin: "4px 0", borderRadius: 8 },
+      },
+    );
+  }
 
   const handleLogout = () => {
     Modal.confirm({
@@ -623,21 +668,23 @@ export default function MainLayout() {
 
             <Space size={24} align="center">
               {/* Notification Bell với màu sắc */}
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  background: currentColor.secondary,
-                  borderRadius: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  border: `1px solid ${currentColor.light}`,
-                }}
-              >
-                <NotificationBell />
-              </div>
+              {user?.role !== ROLES.TENANT && (
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    background: currentColor.secondary,
+                    borderRadius: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    border: `1px solid ${currentColor.light}`,
+                  }}
+                >
+                  <NotificationBell />
+                </div>
+              )}
 
               <Divider
                 type="vertical"

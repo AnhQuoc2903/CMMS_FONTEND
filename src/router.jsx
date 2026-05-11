@@ -22,6 +22,7 @@ import NotificationsPage from "./pages/Notifications";
 import Dashboard from "./pages/Dashboard";
 import InventoryDetail from "./pages/InventoryDetail";
 import AssetGroups from "./pages/AssetGroups";
+import MyRequests from "./pages/MyRequests";
 
 export default function Router() {
   return (
@@ -46,6 +47,15 @@ export default function Router() {
             element={
               <ProtectedRoute>
                 <WorkOrders />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/my-requests"
+            element={
+              <ProtectedRoute roles={[ROLES.TENANT]}>
+                <MyRequests />
               </ProtectedRoute>
             }
           />
