@@ -608,17 +608,7 @@ export default function MainLayout() {
               padding: "0 20px",
               textAlign: "center",
             }}
-          >
-            <Divider
-              style={{ margin: "0 0 12px 0", background: currentColor.light }}
-            />
-            <Space direction="vertical" size={2}>
-              <GiftOutlined style={{ color: currentColor.primary }} />
-              <span style={{ color: "#95A5A6", fontSize: 11 }}>
-                Version 2.0.0
-              </span>
-            </Space>
-          </div>
+          ></div>
         )}
       </Sider>
 

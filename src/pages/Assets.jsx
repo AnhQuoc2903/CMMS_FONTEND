@@ -24,14 +24,14 @@ export default function Assets() {
     status: undefined,
   });
 
-  const loadData = (filters) => {
+  const loadData = (filters = {}) => {
     const params = {};
 
-    if (filters.q && filters.q.trim() !== "") {
+    if (filters?.q && filters.q.trim() !== "") {
       params.q = filters.q.trim();
     }
 
-    if (filters.status) {
+    if (filters?.status) {
       params.status = filters.status;
     }
 
